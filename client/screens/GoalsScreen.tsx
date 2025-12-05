@@ -164,8 +164,6 @@ export default function GoalsScreen() {
   const [completeGoalId, setCompleteGoalId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
-    await storage.autoCompleteExpiredSessions();
-    
     const activeGoals = await storage.getActiveGoals();
     setGoals(activeGoals.sort((a, b) => {
       const aCompleted = a.currentAmount >= a.targetAmount;
@@ -184,7 +182,16 @@ export default function GoalsScreen() {
     
     const completed = await storage.getCompletedWorkSessions();
     setCompletedSessions(completed.slice(0, 10));
-  }, []);
+    
+    const expiredSessions = await storage.getExpiredUncompletedSessions();
+    if (expiredSessions.length > 0 && !showCompleteModal) {
+      setCompletingSession(expiredSessions[0]);
+      setActualEarning("");
+      setActualContribution("");
+      setCompleteGoalId(null);
+      setShowCompleteModal(true);
+    }
+  }, [showCompleteModal]);
 
   useFocusEffect(
     useCallback(() => {
@@ -413,16 +420,6 @@ export default function GoalsScreen() {
   };
 
   const handleSaveWorkSession = async () => {
-    const sessionDate = selectedDate.toDateString();
-    const existingSession = workSessions.find(s => 
-      new Date(s.date).toDateString() === sessionDate && s.shiftType === shiftType
-    );
-    
-    if (existingSession) {
-      Alert.alert("Ошибка", `У вас уже есть ${shiftType === "day" ? "дневная" : "ночная"} смена на эту дату`);
-      return;
-    }
-
     await storage.addWorkSession({
       date: selectedDate.toISOString(),
       operationType: workOperation,
@@ -791,32 +788,41 @@ export default function GoalsScreen() {
               <View style={styles.completedHeader}>
                 <MaterialCommunityIcons
                   name="check-circle"
-                  size={16}
+                  size={20}
                   color={Colors.light.success}
                 />
-                <ThemedText type="body" style={styles.completedTitle}>Завершено</ThemedText>
+                <ThemedText type="h4" style={styles.completedTitle}>Заработано</ThemedText>
+                <ThemedText type="h3" style={styles.completedTotal}>
+                  {formatCurrency(getTotalCompletedEarnings())} ₽
+                </ThemedText>
               </View>
-              <ThemedText type="h3" style={styles.completedTotal}>
-                {formatCurrency(getTotalCompletedEarnings())} ₽
-              </ThemedText>
               
               <View style={styles.barsContainer}>
                 {completedSessions.slice(0, 7).reverse().map((session, index) => {
                   const maxEarning = getMaxCompletedEarning();
-                  const barHeight = ((session.actualEarning || 0) / maxEarning) * 60;
+                  const barHeight = maxEarning > 0 
+                    ? ((session.actualEarning || 0) / maxEarning) * 80 
+                    : 4;
+                  const sessionDate = new Date(session.date);
                   
                   return (
                     <View key={session.id} style={styles.barWrapper}>
+                      <ThemedText type="caption" style={styles.barAmountLabel}>
+                        {formatCurrency(session.actualEarning || 0)}
+                      </ThemedText>
                       <View style={styles.barColumn}>
                         <View 
                           style={[
                             styles.bar, 
-                            { height: Math.max(4, barHeight) }
+                            { height: Math.max(8, barHeight) }
                           ]} 
                         />
                       </View>
                       <ThemedText type="caption" style={styles.barLabel}>
-                        {new Date(session.date).toLocaleDateString("ru-RU", { day: "numeric" })}
+                        {sessionDate.toLocaleDateString("ru-RU", { day: "numeric" })}
+                      </ThemedText>
+                      <ThemedText type="caption" style={styles.barMonthLabel}>
+                        {sessionDate.toLocaleDateString("ru-RU", { month: "short" }).slice(0, 3)}
                       </ThemedText>
                     </View>
                   );
@@ -1319,15 +1325,26 @@ export default function GoalsScreen() {
               )}
 
               {getActualFreeToSafe() > 0 && (
-                <View style={styles.freeToSafeCard}>
+                <View style={[
+                  styles.freeToSafeCard, 
+                  !completeGoalId && styles.freeToSafeWarning
+                ]}>
                   <MaterialCommunityIcons
-                    name="safe"
+                    name={!completeGoalId ? "alert-circle" : "safe"}
                     size={18}
-                    color={Colors.light.success}
+                    color={!completeGoalId ? Colors.light.warning : Colors.light.success}
                   />
                   <View style={styles.freeToSafeContent}>
-                    <ThemedText type="caption" style={styles.freeToSafeLabel}>В сейф</ThemedText>
-                    <ThemedText type="body" style={styles.freeToSafeAmount}>
+                    <ThemedText type="caption" style={[
+                      styles.freeToSafeLabel,
+                      !completeGoalId && styles.freeToSafeWarningLabel
+                    ]}>
+                      {!completeGoalId ? "Все деньги пойдут в сейф" : "В сейф"}
+                    </ThemedText>
+                    <ThemedText type="body" style={[
+                      styles.freeToSafeAmount,
+                      !completeGoalId && styles.freeToSafeWarningAmount
+                    ]}>
                       {formatCurrency(getActualFreeToSafe())} ₽
                     </ThemedText>
                   </View>
@@ -1388,13 +1405,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: Responsive.horizontalPadding,
   },
   headerSection: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.lg,
+    paddingTop: Spacing.sm,
   },
   greetingRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 2,
+    marginBottom: Spacing.xs,
   },
   greeting: {
     color: Colors.light.text,
@@ -1414,17 +1432,17 @@ const styles = StyleSheet.create({
   },
   activeShiftsCard: {
     backgroundColor: Colors.light.card,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.sm,
-    marginBottom: Spacing.sm,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.light.warningMuted,
   },
   compactShiftsHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.xs,
-    marginBottom: Spacing.xs,
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
   },
   activeIndicatorDot: {
     width: 6,
@@ -1507,9 +1525,9 @@ const styles = StyleSheet.create({
   },
   plannedShiftsCard: {
     backgroundColor: Colors.light.card,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.sm,
-    marginBottom: Spacing.sm,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.light.cardBorder,
   },
@@ -1563,13 +1581,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: Colors.light.card,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.sm,
-    marginBottom: Spacing.sm,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.light.cardBorder,
     borderStyle: "dashed",
-    gap: Spacing.xs,
+    gap: Spacing.sm,
   },
   addShiftText: {
     color: Colors.light.primary,
@@ -1577,53 +1595,66 @@ const styles = StyleSheet.create({
   },
   completedSection: {
     backgroundColor: Colors.light.card,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.sm,
-    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    marginBottom: Spacing.lg,
     borderWidth: 1,
     borderColor: Colors.light.cardBorder,
   },
   completedHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.xs,
-    marginBottom: Spacing.xs,
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
   completedTitle: {
     color: Colors.light.text,
-    fontWeight: "500",
+    fontWeight: "600",
+    flex: 1,
   },
   completedTotal: {
     color: Colors.light.success,
-    marginBottom: Spacing.sm,
   },
   barsContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    height: 80,
+    height: 130,
+    paddingTop: Spacing.md,
   },
   barWrapper: {
     alignItems: "center",
     flex: 1,
   },
   barColumn: {
-    width: 20,
+    width: 28,
     justifyContent: "flex-end",
-    height: 60,
+    height: 80,
   },
   bar: {
     width: "100%",
     backgroundColor: Colors.light.success,
-    borderRadius: 2,
+    borderRadius: BorderRadius.xs,
+  },
+  barAmountLabel: {
+    color: Colors.light.success,
+    fontSize: 9,
+    fontWeight: "600",
+    marginBottom: 4,
   },
   barLabel: {
+    color: Colors.light.text,
+    fontSize: 12,
+    fontWeight: "500",
+    marginTop: 6,
+  },
+  barMonthLabel: {
     color: Colors.light.textTertiary,
     fontSize: 9,
-    marginTop: 2,
+    textTransform: "lowercase",
   },
   goalsSection: {
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   modalOverlay: {
     flex: 1,
@@ -1961,6 +1992,15 @@ const styles = StyleSheet.create({
   freeToSafeAmount: {
     color: Colors.light.success,
     fontWeight: "600",
+  },
+  freeToSafeWarning: {
+    backgroundColor: Colors.light.warningMuted,
+  },
+  freeToSafeWarningLabel: {
+    color: Colors.light.warning,
+  },
+  freeToSafeWarningAmount: {
+    color: Colors.light.warning,
   },
   completeActionsRow: {
     alignItems: "center",
