@@ -7,14 +7,14 @@
     "icon": "./assets/images/icon.png",
     "scheme": "kopilka",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.kopilka.savings"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0F0F0F",
+        "backgroundColor": "#1A1B23",
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "edgeToEdgeEnabled": true,
@@ -32,16 +32,16 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0F0F0F",
+          "backgroundColor": "#1A1B23",
           "dark": {
-            "backgroundColor": "#0F0F0F"
+            "backgroundColor": "#1A1B23"
           }
         }
       ],
       "expo-web-browser"
     ],
     "experiments": {
-      "reactCompiler": true
+      "reactCompiler": false
     }
   }
 }

@@ -498,4 +498,40 @@ export const storage = {
       return sessionDate <= now && !s.isCompleted && s.status !== "completed" && s.status !== "skipped";
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   },
+
+  async autoCompleteExpiredSessions(): Promise<{ completed: number; sessions: WorkSession[] }> {
+    const sessions = await this.getWorkSessions();
+    const now = new Date();
+    const completedSessions: WorkSession[] = [];
+    let completedCount = 0;
+
+    for (const session of sessions) {
+      if (session.isCompleted || session.status === "completed" || session.status === "skipped") {
+        continue;
+      }
+
+      const shiftDate = new Date(session.date);
+      if (session.shiftType === "day") {
+        shiftDate.setHours(8, 0, 0, 0);
+      } else {
+        shiftDate.setHours(20, 0, 0, 0);
+      }
+
+      const shiftEndDate = new Date(shiftDate);
+      shiftEndDate.setHours(shiftEndDate.getHours() + 12);
+
+      if (now >= shiftEndDate) {
+        await this.completeWorkSession(
+          session.id,
+          session.plannedEarning,
+          session.plannedContribution,
+          session.goalId
+        );
+        completedSessions.push(session);
+        completedCount++;
+      }
+    }
+
+    return { completed: completedCount, sessions: completedSessions };
+  },
 };
