@@ -7,7 +7,6 @@ import {
   Pressable,
   Modal,
   TextInput,
-  Alert,
 } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -17,11 +16,9 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
-import { Card } from "@/components/Card";
-import { GoalCard } from "@/components/GoalCard";
 import { Button } from "@/components/Button";
 import { useTheme } from "@/hooks/useTheme";
-import { Spacing, BorderRadius, Shadows, QUICK_AMOUNTS } from "@/constants/theme";
+import { Spacing, BorderRadius, QUICK_AMOUNTS } from "@/constants/theme";
 import { storage } from "@/lib/storage";
 import { Goal, AppSettings, Safe, WorkSession, ShiftType } from "@/lib/types";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -58,7 +55,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
   
-  const [goals, setGoals] = useState<Goal[]>([]);
+  const [allGoals, setAllGoals] = useState<Goal[]>([]);
+  const [displayGoals, setDisplayGoals] = useState<Goal[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [safe, setSafe] = useState<Safe>({ balance: 0, updatedAt: "" });
   const [activeSessions, setActiveSessions] = useState<WorkSession[]>([]);
@@ -70,7 +68,9 @@ export default function HomeScreen() {
 
   const loadData = useCallback(async () => {
     const activeGoals = await storage.getActiveGoals();
-    setGoals(activeGoals.filter(g => g.currentAmount < g.targetAmount).slice(0, 3));
+    const inProgressGoals = activeGoals.filter(g => g.currentAmount < g.targetAmount);
+    setAllGoals(activeGoals);
+    setDisplayGoals(inProgressGoals.slice(0, 5));
     
     const appSettings = await storage.getSettings();
     setSettings(appSettings);
@@ -143,13 +143,7 @@ export default function HomeScreen() {
     setQuickAmount(number.toLocaleString("ru-RU"));
   };
 
-  const totalSaved = goals.reduce((sum, g) => sum + g.currentAmount, 0);
-  const totalTarget = goals.reduce((sum, g) => sum + g.targetAmount, 0);
-  const overallProgress = totalTarget > 0 ? (totalSaved / totalTarget) * 100 : 0;
-
-  const greeting = settings?.userName 
-    ? `Привет, ${settings.userName}!` 
-    : "Привет!";
+  const totalSaved = allGoals.reduce((sum, g) => sum + g.currentAmount, 0);
 
   return (
     <ThemedView style={styles.container}>
@@ -158,7 +152,7 @@ export default function HomeScreen() {
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: insets.top + Spacing.md,
+            paddingTop: insets.top + Spacing.xl,
             paddingBottom: tabBarHeight + Spacing.xl,
           },
         ]}
@@ -166,156 +160,181 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={theme.primary}
+            tintColor={theme.text}
           />
         }
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <ThemedText type="h1">{greeting}</ThemedText>
-          <ThemedText type="body" secondary style={styles.subtitle}>
-            Ваш прогресс накоплений
+          <ThemedText type="caption" secondary style={styles.headerLabel}>
+            Накоплено
+          </ThemedText>
+          <ThemedText type="amountLarge" style={styles.totalAmount}>
+            {formatCurrency(totalSaved)} <ThemedText type="h2" secondary>₽</ThemedText>
           </ThemedText>
         </View>
 
-        <View style={[styles.overviewCard, { backgroundColor: theme.primary }]}>
-          <View style={styles.overviewContent}>
-            <View style={styles.overviewMain}>
-              <ThemedText type="caption" style={styles.overviewLabel}>
-                Общий прогресс
-              </ThemedText>
-              <ThemedText type="hero" style={styles.overviewAmount}>
-                {formatCurrency(totalSaved)} ₽
-              </ThemedText>
-              <ThemedText type="body" style={styles.overviewTarget}>
-                из {formatCurrency(totalTarget)} ₽
-              </ThemedText>
-            </View>
-            <View style={styles.overviewProgress}>
-              <View style={[styles.progressCircle, { borderColor: "rgba(255,255,255,0.3)" }]}>
-                <View 
-                  style={[
-                    styles.progressCircleInner, 
-                    { backgroundColor: theme.card }
-                  ]}
-                >
-                  <ThemedText type="h3" style={{ color: theme.primary }}>
-                    {Math.round(overallProgress)}%
+        <View style={[styles.divider, { backgroundColor: theme.divider }]} />
+
+        <View style={styles.section}>
+          {safe.balance > 0 && (
+            <Pressable
+              style={styles.listItem}
+              onPress={() => navigation.navigate("SafeDetail")}
+            >
+              <View style={styles.listItemContent}>
+                <ThemedText type="body">Сейф</ThemedText>
+                <View style={styles.listItemRight}>
+                  <ThemedText type="body" style={{ color: theme.accent }}>
+                    {formatCurrency(safe.balance)} ₽
                   </ThemedText>
+                  <MaterialCommunityIcons
+                    name="chevron-right"
+                    size={20}
+                    color={theme.textTertiary}
+                  />
                 </View>
               </View>
-            </View>
-          </View>
+            </Pressable>
+          )}
+
+          {activeSessions.length > 0 && (
+            <Pressable
+              style={styles.listItem}
+              onPress={() => navigation.navigate("ShiftFlow")}
+            >
+              <View style={styles.listItemContent}>
+                <ThemedText type="body">Активные смены</ThemedText>
+                <View style={styles.listItemRight}>
+                  <View style={[styles.badge, { backgroundColor: theme.accent }]}>
+                    <ThemedText type="caption" style={styles.badgeText}>
+                      {activeSessions.length}
+                    </ThemedText>
+                  </View>
+                  <MaterialCommunityIcons
+                    name="chevron-right"
+                    size={20}
+                    color={theme.textTertiary}
+                  />
+                </View>
+              </View>
+            </Pressable>
+          )}
         </View>
 
-        <View style={styles.quickActions}>
-          <Pressable
-            style={[styles.quickAction, { backgroundColor: theme.successMuted }]}
-            onPress={() => navigation.navigate("ShiftFlow")}
-          >
-            <MaterialCommunityIcons name="briefcase-clock" size={24} color={theme.success} />
-            <ThemedText type="small" style={{ color: theme.success, marginTop: 4 }}>
-              Смены
+        {(safe.balance > 0 || activeSessions.length > 0) && (
+          <View style={[styles.divider, { backgroundColor: theme.divider }]} />
+        )}
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <ThemedText type="caption" secondary>
+              Цели
             </ThemedText>
-            {activeSessions.length > 0 && (
-              <View style={[styles.badge, { backgroundColor: theme.success }]}>
-                <ThemedText type="caption" style={styles.badgeText}>
-                  {activeSessions.length}
-                </ThemedText>
-              </View>
-            )}
-          </Pressable>
-          
-          <Pressable
-            style={[styles.quickAction, { backgroundColor: theme.primaryMuted }]}
-            onPress={() => navigation.navigate("SafeDetail")}
-          >
-            <MaterialCommunityIcons name="safe" size={24} color={theme.primary} />
-            <ThemedText type="small" style={{ color: theme.primary, marginTop: 4 }}>
-              Сейф
-            </ThemedText>
-            {safe.balance > 0 && (
-              <ThemedText type="caption" style={{ color: theme.primary }}>
-                {formatCurrency(safe.balance)} ₽
+            <Pressable onPress={() => navigation.navigate("Main", { screen: "GoalsTab" })}>
+              <ThemedText type="small" style={{ color: theme.accent }}>
+                Все
               </ThemedText>
-            )}
-          </Pressable>
-          
+            </Pressable>
+          </View>
+
+          {displayGoals.length > 0 ? (
+            displayGoals.map((goal, index) => {
+              const progress = Math.round((goal.currentAmount / goal.targetAmount) * 100);
+              const remaining = goal.targetAmount - goal.currentAmount;
+              
+              return (
+                <Pressable
+                  key={goal.id}
+                  style={[
+                    styles.goalItem,
+                    index < displayGoals.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.divider },
+                  ]}
+                  onPress={() => navigation.navigate("GoalDetail", { goalId: goal.id })}
+                  onLongPress={() => handleQuickAddOpen(goal)}
+                >
+                  <View style={styles.goalRow}>
+                    <View style={styles.goalInfo}>
+                      <ThemedText type="body" numberOfLines={1}>
+                        {goal.name}
+                      </ThemedText>
+                      <ThemedText type="small" secondary>
+                        {progress}% · осталось {formatCurrency(remaining)} ₽
+                      </ThemedText>
+                    </View>
+                    <View style={styles.goalRight}>
+                      <ThemedText type="amount">
+                        {formatCurrency(goal.currentAmount)}
+                      </ThemedText>
+                      <MaterialCommunityIcons
+                        name="chevron-right"
+                        size={20}
+                        color={theme.textTertiary}
+                      />
+                    </View>
+                  </View>
+                  <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        {
+                          backgroundColor: theme.text,
+                          width: `${Math.min(progress, 100)}%`,
+                        },
+                      ]}
+                    />
+                  </View>
+                </Pressable>
+              );
+            })
+          ) : (
+            <View style={styles.emptyState}>
+              <ThemedText type="body" secondary style={styles.emptyText}>
+                Нет активных целей
+              </ThemedText>
+              <Pressable
+                style={styles.addButton}
+                onPress={() => navigation.navigate("AddGoal")}
+              >
+                <ThemedText type="body" style={{ color: theme.accent }}>
+                  Создать цель
+                </ThemedText>
+              </Pressable>
+            </View>
+          )}
+        </View>
+
+        <View style={[styles.divider, { backgroundColor: theme.divider }]} />
+
+        <View style={styles.section}>
           <Pressable
-            style={[styles.quickAction, { backgroundColor: theme.warningMuted }]}
+            style={styles.listItem}
             onPress={() => navigation.navigate("AddGoal")}
           >
-            <MaterialCommunityIcons name="plus-circle" size={24} color={theme.warning} />
-            <ThemedText type="small" style={{ color: theme.warning, marginTop: 4 }}>
-              Новая цель
-            </ThemedText>
+            <View style={styles.listItemContent}>
+              <ThemedText type="body">Новая цель</ThemedText>
+              <MaterialCommunityIcons
+                name="plus"
+                size={20}
+                color={theme.textTertiary}
+              />
+            </View>
+          </Pressable>
+
+          <Pressable
+            style={styles.listItem}
+            onPress={() => navigation.navigate("ShiftFlow")}
+          >
+            <View style={styles.listItemContent}>
+              <ThemedText type="body">Управление сменами</ThemedText>
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={20}
+                color={theme.textTertiary}
+              />
+            </View>
           </Pressable>
         </View>
-
-        {goals.length > 0 ? (
-          <View style={styles.goalsSection}>
-            <View style={styles.sectionHeader}>
-              <ThemedText type="h3">Активные цели</ThemedText>
-              <Pressable onPress={() => navigation.navigate("Main", { screen: "GoalsTab" })}>
-                <ThemedText type="link">Все цели</ThemedText>
-              </Pressable>
-            </View>
-            {goals.map((goal) => (
-              <GoalCard
-                key={goal.id}
-                goal={goal}
-                onPress={() => navigation.navigate("GoalDetail", { goalId: goal.id })}
-                onQuickAdd={() => handleQuickAddOpen(goal)}
-                daysToGoal={
-                  settings?.averageDailyEarning && settings.averageDailyEarning > 0
-                    ? Math.ceil((goal.targetAmount - goal.currentAmount) / settings.averageDailyEarning)
-                    : null
-                }
-              />
-            ))}
-          </View>
-        ) : (
-          <Card style={styles.emptyCard}>
-            <View style={styles.emptyContent}>
-              <View style={[styles.emptyIcon, { backgroundColor: theme.primaryMuted }]}>
-                <MaterialCommunityIcons name="target" size={32} color={theme.primary} />
-              </View>
-              <ThemedText type="h4" style={styles.emptyTitle}>
-                Начните копить!
-              </ThemedText>
-              <ThemedText type="body" secondary style={styles.emptyText}>
-                Создайте свою первую цель и начните путь к финансовой свободе
-              </ThemedText>
-              <Button onPress={() => navigation.navigate("AddGoal")} style={styles.emptyButton}>
-                Создать цель
-              </Button>
-            </View>
-          </Card>
-        )}
-
-        {safe.balance > 0 && goals.length > 0 && (
-          <Card style={{...styles.safeCard, borderColor: theme.successMuted }}>
-            <View style={styles.safeContent}>
-              <View style={[styles.safeIcon, { backgroundColor: theme.successMuted }]}>
-                <MaterialCommunityIcons name="safe" size={24} color={theme.success} />
-              </View>
-              <View style={styles.safeInfo}>
-                <ThemedText type="small" secondary>В сейфе</ThemedText>
-                <ThemedText type="h4" style={{ color: theme.success }}>
-                  {formatCurrency(safe.balance)} ₽
-                </ThemedText>
-              </View>
-              <Pressable
-                style={[styles.distributeButton, { backgroundColor: theme.success }]}
-                onPress={() => navigation.navigate("SafeDetail")}
-              >
-                <ThemedText type="small" style={{ color: "#FFFFFF" }}>
-                  Распределить
-                </ThemedText>
-              </Pressable>
-            </View>
-          </Card>
-        )}
       </ScrollView>
 
       <Modal
@@ -343,7 +362,7 @@ export default function HomeScreen() {
                   style={[styles.quickAmountButton, { backgroundColor: theme.backgroundSecondary }]}
                   onPress={() => handleQuickAmount(amount)}
                 >
-                  <ThemedText type="body" style={{ color: theme.primary }}>
+                  <ThemedText type="body" style={{ color: theme.accent }}>
                     {amount.toLocaleString("ru-RU")} ₽
                   </ThemedText>
                 </Pressable>
@@ -355,7 +374,7 @@ export default function HomeScreen() {
                 style={[styles.amountInput, { color: theme.text }]}
                 value={quickAmount}
                 onChangeText={formatQuickAmountInput}
-                placeholder="Введите сумму"
+                placeholder="0"
                 placeholderTextColor={theme.textTertiary}
                 keyboardType="numeric"
                 autoFocus
@@ -365,7 +384,7 @@ export default function HomeScreen() {
 
             {selectedGoal && (
               <ThemedText type="small" secondary style={styles.remainingHint}>
-                Осталось до цели: {formatCurrency(selectedGoal.targetAmount - selectedGoal.currentAmount)} ₽
+                Осталось: {formatCurrency(selectedGoal.targetAmount - selectedGoal.currentAmount)} ₽
               </ThemedText>
             )}
 
@@ -402,140 +421,88 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
   },
   header: {
-    marginBottom: Spacing.lg,
-  },
-  subtitle: {
-    marginTop: Spacing.xs,
-  },
-  overviewCard: {
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    marginBottom: Spacing.lg,
-    ...Shadows.lg,
-  },
-  overviewContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    paddingVertical: Spacing.xl,
   },
-  overviewMain: {
-    flex: 1,
-  },
-  overviewLabel: {
-    color: "rgba(255,255,255,0.8)",
-    textTransform: "uppercase",
-    letterSpacing: 1,
+  headerLabel: {
     marginBottom: Spacing.xs,
   },
-  overviewAmount: {
-    color: "#FFFFFF",
-    marginBottom: 4,
+  totalAmount: {
+    textAlign: "center",
   },
-  overviewTarget: {
-    color: "rgba(255,255,255,0.8)",
+  divider: {
+    height: 1,
+    marginVertical: Spacing.sm,
   },
-  overviewProgress: {
-    marginLeft: Spacing.md,
-  },
-  progressCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 4,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  progressCircleInner: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  quickActions: {
-    flexDirection: "row",
-    gap: Spacing.md,
-    marginBottom: Spacing.xl,
-  },
-  quickAction: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: Spacing.lg,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: BorderRadius.lg,
-  },
-  badge: {
-    position: "absolute",
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  goalsSection: {
-    marginBottom: Spacing.lg,
+  section: {
+    paddingVertical: Spacing.sm,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
-  emptyCard: {
-    marginBottom: Spacing.lg,
+  listItem: {
+    paddingVertical: Spacing.md,
   },
-  emptyContent: {
+  listItemContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: Spacing.xl,
   },
-  emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: Spacing.md,
-  },
-  emptyTitle: {
-    marginBottom: Spacing.sm,
-  },
-  emptyText: {
-    textAlign: "center",
-    marginBottom: Spacing.lg,
-  },
-  emptyButton: {
-    minWidth: 160,
-  },
-  safeCard: {
-    marginBottom: Spacing.lg,
-    borderWidth: 2,
-  },
-  safeContent: {
+  listItemRight: {
     flexDirection: "row",
     alignItems: "center",
+    gap: Spacing.sm,
   },
-  safeIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: BorderRadius.md,
-    justifyContent: "center",
+  badge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+  },
+  badgeText: {
+    color: "#0A0A0A",
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  goalItem: {
+    paddingVertical: Spacing.md,
+  },
+  goalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  goalInfo: {
+    flex: 1,
     marginRight: Spacing.md,
   },
-  safeInfo: {
-    flex: 1,
+  goalRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
   },
-  distributeButton: {
-    paddingHorizontal: Spacing.md,
+  progressTrack: {
+    height: 2,
+    borderRadius: 1,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 1,
+  },
+  emptyState: {
+    paddingVertical: Spacing.xl,
+    alignItems: "center",
+  },
+  emptyText: {
+    marginBottom: Spacing.md,
+  },
+  addButton: {
     paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
   },
   modalOverlay: {
     flex: 1,
@@ -548,7 +515,6 @@ const styles = StyleSheet.create({
     maxWidth: 360,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
-    ...Shadows.lg,
   },
   modalHeader: {
     alignItems: "center",
@@ -576,9 +542,9 @@ const styles = StyleSheet.create({
   },
   amountInput: {
     fontSize: 40,
-    fontWeight: "700",
+    fontWeight: "200",
     textAlign: "center",
-    minWidth: 120,
+    minWidth: 100,
   },
   remainingHint: {
     textAlign: "center",

@@ -20,10 +20,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
-import { CircularProgress } from "@/components/CircularProgress";
-import { Card } from "@/components/Card";
 import { ContributionItem } from "@/components/ContributionItem";
-import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { Spacing, BorderRadius } from "@/constants/theme";
 import { storage } from "@/lib/storage";
 import { Goal, Contribution, AppSettings } from "@/lib/types";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -60,6 +58,7 @@ export default function GoalDetailScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<RouteType>();
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const { goalId } = route.params;
 
   const [goal, setGoal] = useState<Goal | null>(null);
@@ -96,13 +95,13 @@ export default function GoalDetailScreen() {
         >
           <MaterialCommunityIcons
             name="pencil"
-            size={22}
-            color={Colors.light.text}
+            size={20}
+            color={theme.text}
           />
         </HeaderButton>
       ),
     });
-  }, [navigation, goal, goalId]);
+  }, [navigation, goal, goalId, theme]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -170,7 +169,6 @@ export default function GoalDetailScreen() {
   const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
   const isCompleted = goal.currentAmount >= goal.targetAmount;
   const recentContributions = contributions.slice(0, 5);
-  const iconName = goal.icon || "target";
 
   const daysToGoal = settings?.averageDailyEarning && settings.averageDailyEarning > 0 && remaining > 0
     ? Math.ceil(remaining / settings.averageDailyEarning)
@@ -183,7 +181,7 @@ export default function GoalDetailScreen() {
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: Spacing.md,
+            paddingTop: Spacing.lg,
             paddingBottom: insets.bottom + Spacing.lg,
           },
         ]}
@@ -191,177 +189,150 @@ export default function GoalDetailScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={Colors.light.primary}
+            tintColor={theme.text}
           />
         }
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.iconSection}>
-          <View style={[
-            styles.goalIconContainer,
-            isCompleted && styles.goalIconCompleted,
-          ]}>
-            <MaterialCommunityIcons
-              name={isCompleted ? "check-circle" : iconName as any}
-              size={48}
-              color={isCompleted ? Colors.light.success : Colors.light.primary}
-            />
-          </View>
+        <View style={styles.header}>
+          <ThemedText type="caption" secondary>
+            {isCompleted ? "Накоплено" : "Прогресс"}
+          </ThemedText>
+          <ThemedText type="amountLarge" style={isCompleted && { color: theme.accent }}>
+            {formatCurrency(goal.currentAmount)} <ThemedText type="h2" secondary>₽</ThemedText>
+          </ThemedText>
+          <ThemedText type="small" secondary style={styles.targetText}>
+            из {formatCurrency(goal.targetAmount)} ₽
+          </ThemedText>
         </View>
 
-        <View style={styles.progressSection}>
-          <CircularProgress 
-            percentage={percentage} 
-            color={isCompleted ? Colors.light.success : undefined}
+        <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
+          <View
+            style={[
+              styles.progressFill,
+              {
+                backgroundColor: isCompleted ? theme.accent : theme.text,
+                width: `${percentage}%`,
+              },
+            ]}
           />
-          <View style={styles.amountDisplay}>
-            <ThemedText type="h2" style={[
-              styles.currentAmount,
-              isCompleted && styles.currentAmountCompleted,
-            ]}>
-              {formatCurrency(goal.currentAmount)}
-            </ThemedText>
-            <ThemedText type="body" secondary>
-              из {formatCurrency(goal.targetAmount)} руб.
-            </ThemedText>
-          </View>
         </View>
 
-        {isCompleted ? (
-          <Card style={styles.completedCard}>
-            <View style={styles.completedContent}>
-              <MaterialCommunityIcons
-                name="party-popper"
-                size={32}
-                color={Colors.light.success}
-              />
-              <View style={styles.completedText}>
-                <ThemedText type="h4" style={styles.completedTitle}>
-                  Цель достигнута!
-                </ThemedText>
-                <ThemedText type="small" secondary>
-                  Поздравляем! Вы накопили нужную сумму.
-                </ThemedText>
-              </View>
-            </View>
-            <Pressable
-              onPress={handleArchiveGoal}
-              style={({ pressed }) => [
-                styles.archiveButton,
-                pressed && styles.archiveButtonPressed,
-              ]}
-            >
-              <MaterialCommunityIcons
-                name="archive-arrow-down"
-                size={18}
-                color={Colors.light.success}
-              />
-              <ThemedText type="small" style={styles.archiveButtonText}>
-                Переместить в архив
-              </ThemedText>
-            </Pressable>
-          </Card>
-        ) : (
-          <>
-            <Card style={styles.remainingCard}>
-              <View style={styles.remainingContent}>
-                <MaterialCommunityIcons
-                  name="flag-checkered"
-                  size={24}
-                  color={Colors.light.warning}
-                />
-                <View style={styles.remainingText}>
-                  <ThemedText type="small" secondary>
-                    Осталось накопить
-                  </ThemedText>
-                  <ThemedText type="h3" style={styles.remainingAmount}>
-                    {formatCurrency(remaining)} руб.
-                  </ThemedText>
-                </View>
-              </View>
-            </Card>
+        <View style={[styles.divider, { backgroundColor: theme.divider }]} />
 
-            {daysToGoal !== null ? (
-              <Card style={styles.daysCard}>
-                <View style={styles.daysContent}>
-                  <MaterialCommunityIcons
-                    name="calendar-clock"
-                    size={24}
-                    color={Colors.light.primary}
-                  />
-                  <View style={styles.daysText}>
-                    <ThemedText type="small" secondary>
-                      При текущем заработке
-                    </ThemedText>
-                    <View style={styles.daysRow}>
-                      <ThemedText type="h3" style={styles.daysAmount}>
-                        {daysToGoal}
-                      </ThemedText>
-                      <ThemedText type="body" style={styles.daysLabel}>
-                        {getDaysWord(daysToGoal)} до цели
-                      </ThemedText>
-                    </View>
-                  </View>
-                </View>
-              </Card>
-            ) : (
-              <Card style={styles.daysCard}>
-                <View style={styles.daysContent}>
-                  <MaterialCommunityIcons
-                    name="information-outline"
-                    size={24}
-                    color={Colors.light.textSecondary}
-                  />
-                  <ThemedText type="small" secondary style={styles.daysHint}>
-                    Укажите средний заработок в настройках для расчёта дней до цели
-                  </ThemedText>
-                </View>
-              </Card>
-            )}
+        <View style={styles.statsSection}>
+          <View style={styles.statRow}>
+            <ThemedText type="body" secondary>Выполнено</ThemedText>
+            <ThemedText type="body">{Math.round(percentage)}%</ThemedText>
+          </View>
+          
+          {!isCompleted && (
+            <View style={styles.statRow}>
+              <ThemedText type="body" secondary>Осталось</ThemedText>
+              <ThemedText type="body">{formatCurrency(remaining)} ₽</ThemedText>
+            </View>
+          )}
+
+          {daysToGoal !== null && (
+            <View style={styles.statRow}>
+              <ThemedText type="body" secondary>Прогноз</ThemedText>
+              <ThemedText type="body">{daysToGoal} {getDaysWord(daysToGoal)}</ThemedText>
+            </View>
+          )}
+        </View>
+
+        {isCompleted && (
+          <>
+            <View style={[styles.divider, { backgroundColor: theme.divider }]} />
+            <View style={styles.completedSection}>
+              <ThemedText type="body" style={{ color: theme.accent }}>
+                Цель достигнута
+              </ThemedText>
+              <Pressable
+                style={styles.archiveLink}
+                onPress={handleArchiveGoal}
+              >
+                <ThemedText type="small" secondary>
+                  Переместить в архив
+                </ThemedText>
+                <MaterialCommunityIcons
+                  name="chevron-right"
+                  size={18}
+                  color={theme.textTertiary}
+                />
+              </Pressable>
+            </View>
           </>
         )}
 
-        {contributions.length > 0 ? (
-          <View style={styles.historySection}>
-            <View style={styles.sectionHeader}>
-              <ThemedText type="h4">Последние накопления</ThemedText>
-              {contributions.length > 5 ? (
-                <Pressable onPress={() => {}}>
-                  <ThemedText type="link">Все</ThemedText>
-                </Pressable>
-              ) : null}
+        {contributions.length > 0 && (
+          <>
+            <View style={[styles.divider, { backgroundColor: theme.divider }]} />
+            <View style={styles.historySection}>
+              <View style={styles.sectionHeader}>
+                <ThemedText type="caption" secondary>
+                  История
+                </ThemedText>
+                {contributions.length > 5 && (
+                  <ThemedText type="small" style={{ color: theme.accent }}>
+                    Все ({contributions.length})
+                  </ThemedText>
+                )}
+              </View>
+              <View style={styles.contributionsList}>
+                {recentContributions.map((contribution) => (
+                  <ContributionItem
+                    key={contribution.id}
+                    contribution={contribution}
+                    onPress={() => handleContributionPress(contribution.id)}
+                  />
+                ))}
+              </View>
             </View>
-            <View style={styles.contributionsList}>
-              {recentContributions.map((contribution) => (
-                <ContributionItem
-                  key={contribution.id}
-                  contribution={contribution}
-                  onPress={() => handleContributionPress(contribution.id)}
-                />
-              ))}
-            </View>
-          </View>
-        ) : null}
+          </>
+        )}
+
+        <View style={[styles.divider, { backgroundColor: theme.divider }]} />
 
         <View style={styles.actionsSection}>
-          {!isCompleted ? (
-            <Pressable onPress={handleArchiveGoal} style={styles.archiveAction}>
+          <Pressable
+            style={styles.actionItem}
+            onPress={() => navigation.navigate("AddContribution", { goalId })}
+          >
+            <ThemedText type="body">Добавить накопление</ThemedText>
+            <MaterialCommunityIcons
+              name="plus"
+              size={20}
+              color={theme.textTertiary}
+            />
+          </Pressable>
+
+          {!isCompleted && (
+            <Pressable
+              style={styles.actionItem}
+              onPress={handleArchiveGoal}
+            >
+              <ThemedText type="body" secondary>В архив</ThemedText>
               <MaterialCommunityIcons
                 name="archive-outline"
                 size={20}
-                color={Colors.light.textSecondary}
+                color={theme.textTertiary}
               />
-              <ThemedText secondary>Переместить в архив</ThemedText>
             </Pressable>
-          ) : null}
+          )}
 
-          <Pressable onPress={handleDeleteGoal} style={styles.deleteButton}>
+          <Pressable
+            style={styles.actionItem}
+            onPress={handleDeleteGoal}
+          >
+            <ThemedText type="body" style={{ color: theme.error }}>
+              Удалить
+            </ThemedText>
             <MaterialCommunityIcons
               name="delete-outline"
               size={20}
-              color={Colors.light.error}
+              color={theme.error}
             />
-            <ThemedText style={styles.deleteText}>Удалить цель</ThemedText>
           </Pressable>
         </View>
       </ScrollView>
@@ -382,142 +353,68 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.lg,
   },
-  iconSection: {
+  header: {
     alignItems: "center",
-    marginBottom: Spacing.md,
+    paddingVertical: Spacing.xl,
   },
-  goalIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(0, 91, 255, 0.1)",
-    justifyContent: "center",
-    alignItems: "center",
+  targetText: {
+    marginTop: Spacing.xs,
   },
-  goalIconCompleted: {
-    backgroundColor: "rgba(16, 185, 129, 0.1)",
-  },
-  progressSection: {
-    alignItems: "center",
+  progressTrack: {
+    height: 4,
+    borderRadius: 2,
+    overflow: "hidden",
     marginBottom: Spacing.lg,
   },
-  amountDisplay: {
-    alignItems: "center",
-    marginTop: Spacing.md,
+  progressFill: {
+    height: "100%",
+    borderRadius: 2,
   },
-  currentAmount: {
-    color: Colors.light.primary,
+  divider: {
+    height: 1,
+    marginVertical: Spacing.sm,
   },
-  currentAmountCompleted: {
-    color: Colors.light.success,
-  },
-  completedCard: {
-    marginBottom: Spacing.md,
-    backgroundColor: "rgba(16, 185, 129, 0.08)",
-    borderWidth: 1,
-    borderColor: Colors.light.success,
-  },
-  completedContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: Spacing.md,
-  },
-  completedText: {
-    flex: 1,
-    marginLeft: Spacing.md,
-  },
-  completedTitle: {
-    color: Colors.light.success,
-  },
-  archiveButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.xs,
+  statsSection: {
     paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
   },
-  archiveButtonPressed: {
-    opacity: 0.7,
+  statRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
   },
-  archiveButtonText: {
-    color: Colors.light.success,
-    fontWeight: "600",
+  completedSection: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: Spacing.md,
   },
-  remainingCard: {
-    marginBottom: Spacing.md,
-  },
-  remainingContent: {
+  archiveLink: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  remainingText: {
-    marginLeft: Spacing.md,
-  },
-  remainingAmount: {
-    color: Colors.light.warning,
-  },
-  daysCard: {
-    marginBottom: Spacing.md,
-  },
-  daysContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  daysText: {
-    marginLeft: Spacing.md,
-    flex: 1,
-  },
-  daysRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
     gap: Spacing.xs,
-  },
-  daysAmount: {
-    color: Colors.light.primary,
-  },
-  daysLabel: {
-    color: Colors.light.primary,
-  },
-  daysHint: {
-    flex: 1,
-    marginLeft: Spacing.sm,
   },
   historySection: {
-    marginBottom: Spacing.lg,
-    marginTop: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   contributionsList: {
     gap: Spacing.xs,
   },
   actionsSection: {
-    marginTop: Spacing.lg,
-    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
   },
-  archiveAction: {
+  actionItem: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.xs,
     paddingVertical: Spacing.md,
-  },
-  deleteButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: Spacing.md,
-  },
-  deleteText: {
-    color: Colors.light.error,
-    marginLeft: Spacing.xs,
   },
 });

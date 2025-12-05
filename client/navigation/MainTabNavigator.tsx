@@ -7,7 +7,6 @@ import HomeStackNavigator from "@/navigation/HomeStackNavigator";
 import GoalsStackNavigator from "@/navigation/GoalsStackNavigator";
 import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
 import { useTheme } from "@/hooks/useTheme";
-import { BorderRadius } from "@/constants/theme";
 
 export type MainTabParamList = {
   HomeTab: undefined;
@@ -24,34 +23,38 @@ export default function MainTabNavigator() {
     <Tab.Navigator
       initialRouteName="HomeTab"
       screenOptions={{
-        tabBarActiveTintColor: theme.primary,
-        tabBarInactiveTintColor: theme.tabIconDefault,
+        tabBarActiveTintColor: theme.text,
+        tabBarInactiveTintColor: theme.textTertiary,
         tabBarStyle: {
           position: "absolute",
           backgroundColor: Platform.select({
-            ios: isDark ? "rgba(17, 24, 39, 0.92)" : "rgba(255, 255, 255, 0.92)",
+            ios: "transparent",
             android: theme.backgroundDefault,
             web: theme.backgroundDefault,
           }),
           borderTopWidth: 1,
-          borderTopColor: theme.border,
+          borderTopColor: theme.divider,
           elevation: 0,
-          height: Platform.select({ ios: 88, android: 68, web: 68 }),
-          paddingBottom: Platform.select({ ios: 28, android: 10, web: 10 }),
-          paddingTop: 10,
+          height: Platform.select({ ios: 84, android: 64, web: 64 }),
+          paddingBottom: Platform.select({ ios: 28, android: 8, web: 8 }),
+          paddingTop: 8,
         },
         tabBarBackground: () =>
           Platform.OS === "ios" ? (
             <BlurView
-              intensity={80}
+              intensity={100}
               tint={isDark ? "dark" : "light"}
               style={StyleSheet.absoluteFill}
             />
           ) : null,
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "500",
+          fontSize: 11,
+          fontWeight: "400",
+          letterSpacing: 0.3,
           marginTop: 2,
+        },
+        tabBarIconStyle: {
+          marginBottom: -2,
         },
         headerShown: false,
       }}
@@ -61,8 +64,12 @@ export default function MainTabNavigator() {
         component={HomeStackNavigator}
         options={{
           title: "Главная",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="home" size={26} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialCommunityIcons
+              name={focused ? "home" : "home-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
@@ -71,8 +78,12 @@ export default function MainTabNavigator() {
         component={GoalsStackNavigator}
         options={{
           title: "Цели",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="target" size={26} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialCommunityIcons
+              name={focused ? "flag" : "flag-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
@@ -81,8 +92,12 @@ export default function MainTabNavigator() {
         component={ProfileStackNavigator}
         options={{
           title: "Профиль",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="account-circle" size={26} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialCommunityIcons
+              name={focused ? "account-circle" : "account-circle-outline"}
+              size={24}
+              color={color}
+            />
           ),
         }}
       />
