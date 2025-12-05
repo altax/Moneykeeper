@@ -7,8 +7,7 @@ import GoalsStackNavigator from "@/navigation/GoalsStackNavigator";
 import SafeStackNavigator from "@/navigation/SafeStackNavigator";
 import HistoryStackNavigator from "@/navigation/HistoryStackNavigator";
 import SettingsStackNavigator from "@/navigation/SettingsStackNavigator";
-import { useTheme } from "@/hooks/useTheme";
-import { Colors } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 
 export type MainTabParamList = {
   GoalsTab: undefined;
@@ -20,37 +19,39 @@ export type MainTabParamList = {
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export default function MainTabNavigator() {
-  const { theme, isDark } = useTheme();
-
   return (
     <Tab.Navigator
       initialRouteName="GoalsTab"
       screenOptions={{
-        tabBarActiveTintColor: theme.tabIconSelected,
-        tabBarInactiveTintColor: theme.tabIconDefault,
+        tabBarActiveTintColor: Colors.light.primary,
+        tabBarInactiveTintColor: Colors.light.textTertiary,
         tabBarStyle: {
           position: "absolute",
           backgroundColor: Platform.select({
-            ios: "rgba(26, 26, 26, 0.95)",
-            android: Colors.light.backgroundRoot,
-            web: Colors.light.backgroundRoot,
+            ios: "rgba(18, 18, 26, 0.92)",
+            android: Colors.light.backgroundDefault,
+            web: Colors.light.backgroundDefault,
           }),
           borderTopWidth: 1,
           borderTopColor: Colors.light.border,
           elevation: 0,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.3,
-          shadowRadius: 8,
+          height: Platform.select({ ios: 85, android: 65, web: 65 }),
+          paddingBottom: Platform.select({ ios: 28, android: 8, web: 8 }),
+          paddingTop: 8,
         },
         tabBarBackground: () =>
           Platform.OS === "ios" ? (
             <BlurView
-              intensity={100}
+              intensity={80}
               tint="dark"
               style={StyleSheet.absoluteFill}
             />
           ) : null,
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: "500",
+          marginTop: 2,
+        },
         headerShown: false,
       }}
     >
@@ -60,7 +61,7 @@ export default function MainTabNavigator() {
         options={{
           title: "Цели",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="target" size={size} color={color} />
+            <MaterialCommunityIcons name="target" size={24} color={color} />
           ),
         }}
       />
@@ -70,7 +71,7 @@ export default function MainTabNavigator() {
         options={{
           title: "Сейф",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="safe" size={size} color={color} />
+            <MaterialCommunityIcons name="safe" size={24} color={color} />
           ),
         }}
       />
@@ -80,7 +81,7 @@ export default function MainTabNavigator() {
         options={{
           title: "История",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="history" size={size} color={color} />
+            <MaterialCommunityIcons name="history" size={24} color={color} />
           ),
         }}
       />
@@ -90,7 +91,7 @@ export default function MainTabNavigator() {
         options={{
           title: "Настройки",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="cog" size={size} color={color} />
+            <MaterialCommunityIcons name="cog-outline" size={24} color={color} />
           ),
         }}
       />

@@ -15,17 +15,17 @@ interface ProgressBarProps {
   dynamicColor?: boolean;
 }
 
-export function ProgressBar({ percentage, height = 8, color, dynamicColor = true }: ProgressBarProps) {
+export function ProgressBar({ percentage, height = 6, color, dynamicColor = true }: ProgressBarProps) {
   const progress = useSharedValue(0);
   const colorProgress = useSharedValue(0);
 
   useEffect(() => {
     progress.value = withTiming(Math.min(percentage, 100) / 100, {
-      duration: 400,
+      duration: 500,
       easing: Easing.out(Easing.cubic),
     });
     colorProgress.value = withTiming(Math.min(percentage, 100), {
-      duration: 400,
+      duration: 500,
       easing: Easing.out(Easing.cubic),
     });
   }, [percentage]);
@@ -39,13 +39,13 @@ export function ProgressBar({ percentage, height = 8, color, dynamicColor = true
       if (colorProgress.value >= 100) {
         backgroundColor = Colors.light.success;
       } else if (colorProgress.value >= 75) {
-        backgroundColor = "#34D399";
+        backgroundColor = Colors.light.successLight;
       } else if (colorProgress.value >= 50) {
-        backgroundColor = Colors.light.warning;
-      } else if (colorProgress.value >= 25) {
-        backgroundColor = "#FBBF24";
-      } else {
         backgroundColor = Colors.light.primary;
+      } else if (colorProgress.value >= 25) {
+        backgroundColor = Colors.light.primaryLight;
+      } else {
+        backgroundColor = Colors.light.accent;
       }
     }
     
@@ -60,6 +60,7 @@ export function ProgressBar({ percentage, height = 8, color, dynamicColor = true
       <Animated.View 
         style={[
           styles.fill, 
+          { borderRadius: height / 2 },
           animatedStyle,
         ]} 
       />
@@ -69,13 +70,12 @@ export function ProgressBar({ percentage, height = 8, color, dynamicColor = true
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: BorderRadius.xs,
+    backgroundColor: Colors.light.backgroundTertiary,
+    borderRadius: BorderRadius.full,
     overflow: "hidden",
     width: "100%",
   },
   fill: {
     height: "100%",
-    borderRadius: BorderRadius.xs,
   },
 });

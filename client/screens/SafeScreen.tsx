@@ -16,9 +16,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
-import { Card } from "@/components/Card";
-import { Button } from "@/components/Button";
-import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius, Responsive } from "@/constants/theme";
 import { storage } from "@/lib/storage";
 import { Goal, Safe, SafeTransaction } from "@/lib/types";
 
@@ -41,7 +39,6 @@ export default function SafeScreen() {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
-  const [withdrawAmount, setWithdrawAmount] = useState("");
   const [selectedGoals, setSelectedGoals] = useState<{ [key: string]: string }>({});
 
   const loadData = useCallback(async () => {
@@ -180,17 +177,17 @@ export default function SafeScreen() {
           <View style={styles.balanceIcon}>
             <MaterialCommunityIcons
               name="safe"
-              size={40}
-              color={Colors.light.safe}
+              size={32}
+              color={Colors.light.success}
             />
           </View>
-          <ThemedText type="small" secondary style={styles.balanceLabel}>
+          <ThemedText type="caption" style={styles.balanceLabel}>
             Баланс сейфа
           </ThemedText>
           <ThemedText type="hero" style={styles.balanceAmount}>
-            {formatCurrency(safe.balance)} 
+            {formatCurrency(safe.balance)}
           </ThemedText>
-          <ThemedText type="body" secondary>руб.</ThemedText>
+          <ThemedText type="body" style={styles.currencyLabel}>₽</ThemedText>
         </View>
 
         <View style={styles.actionsRow}>
@@ -201,11 +198,11 @@ export default function SafeScreen() {
             <View style={[styles.actionIconContainer, styles.depositIcon]}>
               <MaterialCommunityIcons
                 name="arrow-down"
-                size={24}
-                color={Colors.light.safe}
+                size={22}
+                color={Colors.light.success}
               />
             </View>
-            <ThemedText type="small">Пополнить</ThemedText>
+            <ThemedText type="small" style={styles.actionText}>Пополнить</ThemedText>
           </Pressable>
 
           <Pressable
@@ -215,73 +212,78 @@ export default function SafeScreen() {
             <View style={[styles.actionIconContainer, styles.withdrawIcon]}>
               <MaterialCommunityIcons
                 name="arrow-up"
-                size={24}
+                size={22}
                 color={Colors.light.primary}
               />
             </View>
-            <ThemedText type="small">На цели</ThemedText>
+            <ThemedText type="small" style={styles.actionText}>На цели</ThemedText>
           </Pressable>
         </View>
 
-        <Card style={styles.infoCard}>
-          <View style={styles.infoContent}>
-            <MaterialCommunityIcons
-              name="information-outline"
-              size={20}
-              color={Colors.light.primary}
-            />
-            <ThemedText type="small" secondary style={styles.infoText}>
-              Сейф хранит излишки средств. Вы можете распределить их на свои цели в любой момент.
-            </ThemedText>
-          </View>
-        </Card>
+        <View style={styles.infoCard}>
+          <MaterialCommunityIcons
+            name="information-outline"
+            size={18}
+            color={Colors.light.primary}
+          />
+          <ThemedText type="small" style={styles.infoText}>
+            Сейф хранит излишки средств. Распределите их на цели в любой момент.
+          </ThemedText>
+        </View>
 
         {recentTransactions.length > 0 ? (
           <View style={styles.historySection}>
             <ThemedText type="h4" style={styles.sectionTitle}>
-              История операций
+              История
             </ThemedText>
-            {recentTransactions.map((transaction) => (
-              <View key={transaction.id} style={styles.transactionItem}>
-                <View style={[
-                  styles.transactionIcon,
-                  transaction.type === "deposit" ? styles.depositBg : styles.withdrawBg,
+            <View style={styles.transactionsList}>
+              {recentTransactions.map((transaction, index) => (
+                <View key={transaction.id} style={[
+                  styles.transactionItem,
+                  index < recentTransactions.length - 1 && styles.transactionItemBorder
                 ]}>
-                  <MaterialCommunityIcons
-                    name={transaction.type === "deposit" ? "arrow-down" : "arrow-up"}
-                    size={18}
-                    color={transaction.type === "deposit" ? Colors.light.safe : Colors.light.primary}
-                  />
-                </View>
-                <View style={styles.transactionInfo}>
-                  <ThemedText type="body">
-                    {transaction.type === "deposit" ? "Пополнение" : "Вывод на цель"}
+                  <View style={[
+                    styles.transactionIcon,
+                    transaction.type === "deposit" ? styles.depositBg : styles.withdrawBg,
+                  ]}>
+                    <MaterialCommunityIcons
+                      name={transaction.type === "deposit" ? "arrow-down" : "arrow-up"}
+                      size={16}
+                      color={transaction.type === "deposit" ? Colors.light.success : Colors.light.primary}
+                    />
+                  </View>
+                  <View style={styles.transactionInfo}>
+                    <ThemedText type="body" style={styles.transactionTitle}>
+                      {transaction.type === "deposit" ? "Пополнение" : "На цель"}
+                    </ThemedText>
+                    <ThemedText type="caption" style={styles.transactionDate}>
+                      {new Date(transaction.date).toLocaleDateString("ru-RU", {
+                        day: "numeric",
+                        month: "short",
+                      })}
+                    </ThemedText>
+                  </View>
+                  <ThemedText
+                    type="body"
+                    style={transaction.type === "deposit" ? styles.positiveAmount : styles.negativeAmount}
+                  >
+                    {transaction.type === "deposit" ? "+" : "-"}
+                    {formatCurrency(transaction.amount)} ₽
                   </ThemedText>
-                  <ThemedText type="caption" secondary>
-                    {new Date(transaction.date).toLocaleDateString("ru-RU", {
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </ThemedText>
                 </View>
-                <ThemedText
-                  type="body"
-                  style={transaction.type === "deposit" ? styles.positiveAmount : styles.negativeAmount}
-                >
-                  {transaction.type === "deposit" ? "+" : "-"}
-                  {formatCurrency(transaction.amount)} руб.
-                </ThemedText>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
         ) : (
           <View style={styles.emptyHistory}>
-            <MaterialCommunityIcons
-              name="history"
-              size={48}
-              color={Colors.light.textSecondary}
-            />
-            <ThemedText type="body" secondary style={styles.emptyText}>
+            <View style={styles.emptyHistoryIcon}>
+              <MaterialCommunityIcons
+                name="history"
+                size={32}
+                color={Colors.light.textTertiary}
+              />
+            </View>
+            <ThemedText type="body" style={styles.emptyText}>
               История операций пуста
             </ThemedText>
           </View>
@@ -301,8 +303,8 @@ export default function SafeScreen() {
           <Pressable style={styles.modalContent} onPress={() => {}}>
             <View style={styles.modalHeader}>
               <ThemedText type="h4">Пополнить сейф</ThemedText>
-              <ThemedText type="small" secondary>
-                Введите сумму для пополнения
+              <ThemedText type="small" style={styles.modalSubtitle}>
+                Введите сумму
               </ThemedText>
             </View>
 
@@ -312,11 +314,11 @@ export default function SafeScreen() {
                 value={depositAmount}
                 onChangeText={(text) => formatAmount(text, setDepositAmount)}
                 placeholder="0"
-                placeholderTextColor={Colors.light.textDisabled}
+                placeholderTextColor={Colors.light.textTertiary}
                 keyboardType="numeric"
                 autoFocus
               />
-              <ThemedText type="h3" secondary> руб.</ThemedText>
+              <ThemedText type="h3" style={styles.inputCurrency}>₽</ThemedText>
             </View>
 
             <View style={styles.modalActions}>
@@ -324,7 +326,7 @@ export default function SafeScreen() {
                 onPress={() => setShowDepositModal(false)}
                 style={[styles.modalButton, styles.modalButtonCancel]}
               >
-                <ThemedText type="body" secondary>Отмена</ThemedText>
+                <ThemedText type="body" style={styles.cancelText}>Отмена</ThemedText>
               </Pressable>
               <Pressable
                 onPress={handleDeposit}
@@ -350,8 +352,8 @@ export default function SafeScreen() {
           <Pressable style={styles.withdrawModalContent} onPress={() => {}}>
             <View style={styles.modalHeader}>
               <ThemedText type="h4">Распределить на цели</ThemedText>
-              <ThemedText type="small" secondary>
-                Доступно: {formatCurrency(safe.balance)} руб.
+              <ThemedText type="small" style={styles.modalSubtitle}>
+                Доступно: {formatCurrency(safe.balance)} ₽
               </ThemedText>
             </View>
 
@@ -371,24 +373,18 @@ export default function SafeScreen() {
                       onPress={() => toggleGoalSelection(item.id)}
                     >
                       <View style={styles.goalCheckbox}>
-                        {isSelected ? (
-                          <MaterialCommunityIcons
-                            name="checkbox-marked"
-                            size={24}
-                            color={Colors.light.primary}
-                          />
-                        ) : (
-                          <MaterialCommunityIcons
-                            name="checkbox-blank-outline"
-                            size={24}
-                            color={Colors.light.textSecondary}
-                          />
-                        )}
+                        <MaterialCommunityIcons
+                          name={isSelected ? "checkbox-marked" : "checkbox-blank-outline"}
+                          size={22}
+                          color={isSelected ? Colors.light.primary : Colors.light.textTertiary}
+                        />
                       </View>
                       <View style={styles.goalInfo}>
-                        <ThemedText type="body" numberOfLines={1}>{item.name}</ThemedText>
-                        <ThemedText type="caption" secondary>
-                          Осталось: {formatCurrency(remaining)} руб.
+                        <ThemedText type="body" numberOfLines={1} style={styles.goalName}>
+                          {item.name}
+                        </ThemedText>
+                        <ThemedText type="caption" style={styles.goalRemaining}>
+                          Осталось: {formatCurrency(remaining)} ₽
                         </ThemedText>
                       </View>
                       {isSelected && (
@@ -396,8 +392,8 @@ export default function SafeScreen() {
                           style={styles.goalAmountInput}
                           value={selectedGoals[item.id]}
                           onChangeText={(text) => updateGoalAmount(item.id, text)}
-                          placeholder="Сумма"
-                          placeholderTextColor={Colors.light.textDisabled}
+                          placeholder="0"
+                          placeholderTextColor={Colors.light.textTertiary}
                           keyboardType="numeric"
                         />
                       )}
@@ -409,17 +405,17 @@ export default function SafeScreen() {
               />
             ) : (
               <View style={styles.noGoals}>
-                <ThemedText type="body" secondary>
-                  Нет активных целей для пополнения
+                <ThemedText type="body" style={styles.noGoalsText}>
+                  Нет активных целей
                 </ThemedText>
               </View>
             )}
 
             {Object.keys(selectedGoals).length > 0 && (
               <View style={styles.totalRow}>
-                <ThemedText type="body">Итого к распределению:</ThemedText>
+                <ThemedText type="body" style={styles.totalLabel}>Итого:</ThemedText>
                 <ThemedText type="h4" style={styles.totalAmount}>
-                  {formatCurrency(getTotalWithdrawAmount())} руб.
+                  {formatCurrency(getTotalWithdrawAmount())} ₽
                 </ThemedText>
               </View>
             )}
@@ -432,7 +428,7 @@ export default function SafeScreen() {
                 }}
                 style={[styles.modalButton, styles.modalButtonCancel]}
               >
-                <ThemedText type="body" secondary>Отмена</ThemedText>
+                <ThemedText type="body" style={styles.cancelText}>Отмена</ThemedText>
               </Pressable>
               <Pressable
                 onPress={handleWithdraw}
@@ -456,12 +452,13 @@ export default function SafeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Colors.light.backgroundRoot,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Responsive.horizontalPadding,
   },
   balanceCard: {
     alignItems: "center",
@@ -469,24 +466,30 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   balanceIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.light.safeLight,
+    width: 64,
+    height: 64,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.light.successMuted,
     justifyContent: "center",
     alignItems: "center",
     marginBottom: Spacing.md,
   },
   balanceLabel: {
+    color: Colors.light.textTertiary,
     marginBottom: Spacing.xs,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
   balanceAmount: {
-    color: Colors.light.safe,
+    color: Colors.light.success,
+  },
+  currencyLabel: {
+    color: Colors.light.textTertiary,
   },
   actionsRow: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: Spacing.xl,
+    gap: Spacing.xxl,
     marginBottom: Spacing.lg,
   },
   actionButton: {
@@ -494,62 +497,84 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   actionIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: BorderRadius.lg,
     justifyContent: "center",
     alignItems: "center",
   },
   depositIcon: {
-    backgroundColor: Colors.light.safeLight,
+    backgroundColor: Colors.light.successMuted,
   },
   withdrawIcon: {
-    backgroundColor: "rgba(0, 91, 255, 0.1)",
+    backgroundColor: Colors.light.primaryMuted,
+  },
+  actionText: {
+    color: Colors.light.textSecondary,
   },
   infoCard: {
-    marginBottom: Spacing.lg,
-    backgroundColor: "rgba(0, 91, 255, 0.05)",
-  },
-  infoContent: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: Spacing.sm,
+    backgroundColor: Colors.light.card,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.light.cardBorder,
   },
   infoText: {
     flex: 1,
+    color: Colors.light.textSecondary,
   },
   historySection: {
     marginBottom: Spacing.lg,
   },
   sectionTitle: {
     marginBottom: Spacing.md,
+    color: Colors.light.text,
+  },
+  transactionsList: {
+    backgroundColor: Colors.light.card,
+    borderRadius: BorderRadius.xl,
+    borderWidth: 1,
+    borderColor: Colors.light.cardBorder,
+    overflow: "hidden",
   },
   transactionItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: Spacing.sm,
+    padding: Spacing.md,
+  },
+  transactionItemBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: Colors.light.borderLight,
   },
   transactionIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: BorderRadius.md,
     justifyContent: "center",
     alignItems: "center",
     marginRight: Spacing.sm,
   },
   depositBg: {
-    backgroundColor: Colors.light.safeLight,
+    backgroundColor: Colors.light.successMuted,
   },
   withdrawBg: {
-    backgroundColor: "rgba(0, 91, 255, 0.1)",
+    backgroundColor: Colors.light.primaryMuted,
   },
   transactionInfo: {
     flex: 1,
   },
+  transactionTitle: {
+    color: Colors.light.text,
+  },
+  transactionDate: {
+    color: Colors.light.textTertiary,
+  },
   positiveAmount: {
-    color: Colors.light.safe,
+    color: Colors.light.success,
     fontWeight: "600",
   },
   negativeAmount: {
@@ -560,12 +585,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: Spacing.xxl,
   },
+  emptyHistoryIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: BorderRadius.xl,
+    backgroundColor: Colors.light.backgroundSecondary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
   emptyText: {
-    marginTop: Spacing.md,
+    color: Colors.light.textTertiary,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: Colors.light.overlay,
     justifyContent: "center",
     alignItems: "center",
     padding: Spacing.md,
@@ -575,19 +609,27 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     width: "100%",
-    maxWidth: 360,
+    maxWidth: 340,
+    borderWidth: 1,
+    borderColor: Colors.light.cardBorder,
   },
   withdrawModalContent: {
     backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     width: "100%",
-    maxWidth: 360,
-    maxHeight: "80%",
+    maxWidth: 340,
+    maxHeight: "75%",
+    borderWidth: 1,
+    borderColor: Colors.light.cardBorder,
   },
   modalHeader: {
     alignItems: "center",
     marginBottom: Spacing.lg,
+  },
+  modalSubtitle: {
+    color: Colors.light.textSecondary,
+    marginTop: 4,
   },
   inputContainer: {
     flexDirection: "row",
@@ -596,11 +638,14 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   input: {
-    fontSize: 32,
-    fontWeight: "600",
+    fontSize: 36,
+    fontWeight: "700",
     color: Colors.light.text,
     textAlign: "center",
-    minWidth: 100,
+    minWidth: 80,
+  },
+  inputCurrency: {
+    color: Colors.light.textTertiary,
   },
   modalActions: {
     flexDirection: "row",
@@ -609,7 +654,7 @@ const styles = StyleSheet.create({
   modalButton: {
     flex: 1,
     paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     alignItems: "center",
   },
   modalButtonCancel: {
@@ -621,12 +666,16 @@ const styles = StyleSheet.create({
   modalButtonDisabled: {
     opacity: 0.5,
   },
+  cancelText: {
+    color: Colors.light.textSecondary,
+    fontWeight: "500",
+  },
   confirmText: {
     color: Colors.light.buttonText,
     fontWeight: "600",
   },
   goalsList: {
-    maxHeight: 300,
+    maxHeight: 280,
     marginBottom: Spacing.md,
   },
   goalItem: {
@@ -634,11 +683,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.sm,
-    borderRadius: BorderRadius.md,
+    borderRadius: BorderRadius.lg,
     marginBottom: Spacing.xs,
   },
   goalItemSelected: {
-    backgroundColor: "rgba(0, 91, 255, 0.05)",
+    backgroundColor: Colors.light.primaryMuted,
   },
   goalCheckbox: {
     marginRight: Spacing.sm,
@@ -646,19 +695,29 @@ const styles = StyleSheet.create({
   goalInfo: {
     flex: 1,
   },
+  goalName: {
+    color: Colors.light.text,
+  },
+  goalRemaining: {
+    color: Colors.light.textTertiary,
+  },
   goalAmountInput: {
-    width: 100,
+    width: 90,
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.md,
     backgroundColor: Colors.light.backgroundSecondary,
     fontSize: 14,
+    fontWeight: "600",
     color: Colors.light.text,
     textAlign: "right",
   },
   noGoals: {
     paddingVertical: Spacing.xl,
     alignItems: "center",
+  },
+  noGoalsText: {
+    color: Colors.light.textTertiary,
   },
   totalRow: {
     flexDirection: "row",
@@ -668,6 +727,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.light.border,
     marginBottom: Spacing.md,
+  },
+  totalLabel: {
+    color: Colors.light.textSecondary,
   },
   totalAmount: {
     color: Colors.light.primary,

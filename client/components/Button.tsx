@@ -9,13 +9,14 @@ import Animated, {
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { BorderRadius, Spacing } from "@/constants/theme";
+import { BorderRadius, Spacing, Colors } from "@/constants/theme";
 
 interface ButtonProps {
   onPress?: () => void;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
+  variant?: "primary" | "secondary" | "ghost";
 }
 
 const springConfig: WithSpringConfig = {
@@ -33,6 +34,7 @@ export function Button({
   children,
   style,
   disabled = false,
+  variant = "primary",
 }: ButtonProps) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
@@ -43,13 +45,35 @@ export function Button({
 
   const handlePressIn = () => {
     if (!disabled) {
-      scale.value = withSpring(0.98, springConfig);
+      scale.value = withSpring(0.97, springConfig);
     }
   };
 
   const handlePressOut = () => {
     if (!disabled) {
       scale.value = withSpring(1, springConfig);
+    }
+  };
+
+  const getBackgroundColor = () => {
+    switch (variant) {
+      case "secondary":
+        return Colors.light.backgroundTertiary;
+      case "ghost":
+        return "transparent";
+      default:
+        return Colors.light.primary;
+    }
+  };
+
+  const getTextColor = () => {
+    switch (variant) {
+      case "secondary":
+        return Colors.light.text;
+      case "ghost":
+        return Colors.light.primary;
+      default:
+        return Colors.light.buttonText;
     }
   };
 
@@ -62,16 +86,17 @@ export function Button({
       style={[
         styles.button,
         {
-          backgroundColor: theme.link,
+          backgroundColor: getBackgroundColor(),
           opacity: disabled ? 0.5 : 1,
         },
+        variant === "ghost" && styles.ghostButton,
         style,
         animatedStyle,
       ]}
     >
       <ThemedText
         type="body"
-        style={[styles.buttonText, { color: theme.buttonText }]}
+        style={[styles.buttonText, { color: getTextColor() }]}
       >
         {children}
       </ThemedText>
@@ -82,11 +107,17 @@ export function Button({
 const styles = StyleSheet.create({
   button: {
     height: Spacing.buttonHeight,
-    borderRadius: BorderRadius.full,
+    borderRadius: BorderRadius.lg,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: Spacing.lg,
+  },
+  ghostButton: {
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   buttonText: {
     fontWeight: "600",
+    fontSize: 15,
   },
 });

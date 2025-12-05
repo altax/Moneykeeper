@@ -8,7 +8,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/ThemedText";
-import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius, Responsive } from "@/constants/theme";
 
 interface CardProps {
   elevation?: number;
@@ -79,19 +79,16 @@ export function Card({
 
 const styles = StyleSheet.create({
   card: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    padding: Responsive.cardPadding,
+    borderRadius: BorderRadius.xl,
     backgroundColor: Colors.light.card,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: Colors.light.cardBorder,
   },
   cardTitle: {
     marginBottom: Spacing.sm,
   },
   cardDescription: {
-    opacity: 0.7,
+    color: Colors.light.textSecondary,
   },
 });

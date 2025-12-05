@@ -9,7 +9,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/ThemedText";
 import { ProgressBar } from "@/components/ProgressBar";
-import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius, Responsive } from "@/constants/theme";
 import { Goal } from "@/lib/types";
 
 interface GoalCardProps {
@@ -42,15 +42,15 @@ export function GoalCard({ goal, onPress, onQuickAdd, daysToGoal }: GoalCardProp
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.98, { damping: 15, stiffness: 150 });
+    scale.value = withSpring(0.98, { damping: 15, stiffness: 200 });
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 150 });
+    scale.value = withSpring(1, { damping: 15, stiffness: 200 });
   };
 
   const handleQuickAdd = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onQuickAdd?.();
   };
 
@@ -73,92 +73,95 @@ export function GoalCard({ goal, onPress, onQuickAdd, daysToGoal }: GoalCardProp
           isCompleted && styles.iconContainerCompleted,
         ]}>
           <MaterialCommunityIcons
-            name={isCompleted ? "check-circle" : iconName as any}
-            size={24}
+            name={isCompleted ? "check" : iconName as any}
+            size={20}
             color={isCompleted ? Colors.light.success : Colors.light.primary}
           />
         </View>
         <View style={styles.titleContainer}>
-          <ThemedText type="h4" numberOfLines={1}>
+          <ThemedText type="h4" numberOfLines={1} style={styles.title}>
             {goal.name}
           </ThemedText>
           {isCompleted ? (
             <ThemedText type="caption" style={styles.completedText}>
-              Цель достигнута!
+              Цель достигнута
             </ThemedText>
           ) : (
-            <ThemedText type="caption" secondary>
-              {Math.round(percentage)}% выполнено
+            <ThemedText type="caption" style={styles.percentageText}>
+              {Math.round(percentage)}%
             </ThemedText>
           )}
         </View>
-        {onQuickAdd && !isCompleted ? (
+        {onQuickAdd && !isCompleted && (
           <Pressable
             onPress={handleQuickAdd}
             style={({ pressed }) => [
               styles.quickAddButton,
               pressed && styles.quickAddButtonPressed,
             ]}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
             <MaterialCommunityIcons
               name="plus"
-              size={20}
+              size={18}
               color={Colors.light.primary}
             />
           </Pressable>
-        ) : null}
+        )}
         <MaterialCommunityIcons
           name="chevron-right"
-          size={24}
-          color={Colors.light.textSecondary}
+          size={20}
+          color={Colors.light.textTertiary}
         />
       </View>
 
-      <View style={styles.amountContainer}>
-        <ThemedText type="h2" style={[
-          styles.currentAmount,
-          isCompleted && styles.currentAmountCompleted,
-        ]}>
-          {formatCurrency(goal.currentAmount)}
-        </ThemedText>
-        <ThemedText type="body" secondary>
-          {" "}/ {formatCurrency(goal.targetAmount)}
-        </ThemedText>
+      <View style={styles.amountSection}>
+        <View style={styles.amountRow}>
+          <ThemedText type="h2" style={[
+            styles.currentAmount,
+            isCompleted && styles.currentAmountCompleted,
+          ]}>
+            {formatCurrency(goal.currentAmount)}
+          </ThemedText>
+          <ThemedText type="body" style={styles.targetAmount}>
+            / {formatCurrency(goal.targetAmount)} ₽
+          </ThemedText>
+        </View>
+        
+        <View style={styles.progressContainer}>
+          <ProgressBar 
+            percentage={percentage} 
+            height={6}
+            color={isCompleted ? Colors.light.success : undefined}
+            dynamicColor={!isCompleted}
+          />
+        </View>
       </View>
 
-      <ProgressBar 
-        percentage={percentage} 
-        color={isCompleted ? Colors.light.success : undefined}
-        dynamicColor={!isCompleted}
-      />
-
-      {!isCompleted ? (
-        <View style={styles.remainingRow}>
+      {!isCompleted && (
+        <View style={styles.footer}>
           <View style={styles.remainingInfo}>
-            <MaterialCommunityIcons
-              name="flag-outline"
-              size={16}
-              color={Colors.light.warning}
-            />
-            <ThemedText type="small" style={styles.remainingText}>
-              Осталось: {formatCurrency(remaining)} руб.
+            <ThemedText type="small" style={styles.remainingLabel}>
+              Осталось
+            </ThemedText>
+            <ThemedText type="small" style={styles.remainingValue}>
+              {formatCurrency(remaining)} ₽
             </ThemedText>
           </View>
-          {daysToGoal !== null && daysToGoal !== undefined && daysToGoal > 0 ? (
+          {daysToGoal !== null && daysToGoal !== undefined && daysToGoal > 0 && (
             <View style={styles.daysInfo}>
               <MaterialCommunityIcons
-                name="calendar-clock"
+                name="clock-outline"
                 size={14}
-                color={Colors.light.textSecondary}
+                color={Colors.light.textTertiary}
               />
-              <ThemedText type="caption" secondary>
-                {daysToGoal} {getDaysWord(daysToGoal)}
+              <ThemedText type="small" style={styles.daysText}>
+                ~{daysToGoal} {getDaysWord(daysToGoal)}
               </ThemedText>
             </View>
-          ) : null}
+          )}
         </View>
-      ) : null}
+      )}
     </AnimatedPressable>
   );
 }
@@ -182,21 +185,15 @@ function getDaysWord(days: number): string {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.light.card,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
+    borderRadius: BorderRadius.xl,
+    padding: Responsive.cardPadding,
     marginBottom: Spacing.md,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 4,
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: Colors.light.cardBorder,
   },
   cardCompleted: {
-    borderWidth: 1,
-    borderColor: Colors.light.success,
-    backgroundColor: "rgba(16, 185, 129, 0.08)",
+    borderColor: Colors.light.successMuted,
+    backgroundColor: Colors.light.card,
   },
   header: {
     flexDirection: "row",
@@ -204,66 +201,91 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   iconContainer: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: BorderRadius.md,
-    backgroundColor: "rgba(255, 107, 53, 0.15)",
+    backgroundColor: Colors.light.primaryMuted,
     justifyContent: "center",
     alignItems: "center",
     marginRight: Spacing.sm,
   },
   iconContainerCompleted: {
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    backgroundColor: Colors.light.successMuted,
   },
   titleContainer: {
     flex: 1,
+    marginRight: Spacing.sm,
+  },
+  title: {
+    marginBottom: 2,
   },
   completedText: {
     color: Colors.light.success,
   },
+  percentageText: {
+    color: Colors.light.textSecondary,
+  },
   quickAddButton: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     borderRadius: BorderRadius.full,
-    backgroundColor: "rgba(255, 107, 53, 0.15)",
+    backgroundColor: Colors.light.primaryMuted,
     justifyContent: "center",
     alignItems: "center",
     marginRight: Spacing.sm,
   },
   quickAddButtonPressed: {
-    backgroundColor: "rgba(255, 107, 53, 0.3)",
+    backgroundColor: Colors.light.primary,
   },
-  amountContainer: {
+  amountSection: {
+    marginBottom: Spacing.sm,
+  },
+  amountRow: {
     flexDirection: "row",
     alignItems: "baseline",
     marginBottom: Spacing.sm,
   },
   currentAmount: {
-    color: Colors.light.primary,
+    color: Colors.light.text,
+    fontWeight: "700",
   },
   currentAmountCompleted: {
     color: Colors.light.success,
   },
-  remainingRow: {
+  targetAmount: {
+    color: Colors.light.textTertiary,
+    marginLeft: 4,
+  },
+  progressContainer: {
+    marginTop: 4,
+  },
+  footer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: Spacing.sm,
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: Colors.light.borderLight,
+    marginTop: Spacing.xs,
   },
   remainingInfo: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
   },
-  remainingText: {
-    color: Colors.light.warning,
+  remainingLabel: {
+    color: Colors.light.textTertiary,
+  },
+  remainingValue: {
+    color: Colors.light.textSecondary,
+    fontWeight: "500",
   },
   daysInfo: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+  },
+  daysText: {
+    color: Colors.light.textTertiary,
   },
 });
