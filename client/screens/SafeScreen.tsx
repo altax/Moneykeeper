@@ -137,7 +137,14 @@ export default function SafeScreen() {
       return;
     }
     const number = parseInt(cleaned, 10);
-    setSelectedGoals(prev => ({ ...prev, [goalId]: number.toLocaleString("ru-RU") }));
+    const goal = goals.find(g => g.id === goalId);
+    if (goal) {
+      const remaining = goal.targetAmount - goal.currentAmount;
+      const limitedAmount = Math.min(number, remaining);
+      setSelectedGoals(prev => ({ ...prev, [goalId]: limitedAmount.toLocaleString("ru-RU") }));
+    } else {
+      setSelectedGoals(prev => ({ ...prev, [goalId]: number.toLocaleString("ru-RU") }));
+    }
   };
 
   const getTotalWithdrawAmount = () => {

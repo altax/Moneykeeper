@@ -13,7 +13,7 @@ import { FAB } from "@/components/FAB";
 import { EmptyState } from "@/components/EmptyState";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { storage } from "@/lib/storage";
-import { Goal, AppSettings, WorkSession, WorkOperationType } from "@/lib/types";
+import { Goal, AppSettings, WorkSession, WorkOperationType, ShiftType } from "@/lib/types";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
 import { GoalsStackParamList } from "@/navigation/GoalsStackNavigator";
 
@@ -65,6 +65,8 @@ export default function GoalsScreen() {
   const [workOperation, setWorkOperation] = useState<WorkOperationType>("reception");
   const [plannedEarning, setPlannedEarning] = useState("");
   const [plannedContribution, setPlannedContribution] = useState("");
+  const [shiftType, setShiftType] = useState<ShiftType>("day");
+  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     const activeGoals = await storage.getActiveGoals();
@@ -306,34 +308,18 @@ export default function GoalsScreen() {
   };
 
   const getDateOptions = (): { date: Date; label: string; isCustom?: boolean }[] => {
-    const options: { date: Date; label: string; isCustom?: boolean }[] = [];
     const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const dayAfter = new Date(today);
+    dayAfter.setDate(today.getDate() + 2);
     
-    for (let i = 0; i < 30; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
-      
-      let label = "";
-      if (i === 0) {
-        label = "Сегодня";
-      } else if (i === 1) {
-        label = "Завтра";
-      } else if (i === 2) {
-        label = "Послезавтра";
-      } else {
-        label = date.toLocaleDateString("ru-RU", { 
-          day: "numeric", 
-          month: "short",
-          weekday: "short" 
-        });
-      }
-      
-      options.push({ date, label });
-    }
-    
-    options.push({ date: new Date(), label: "Другая дата...", isCustom: true });
-    
-    return options;
+    return [
+      { date: today, label: "Сегодня" },
+      { date: tomorrow, label: "Завтра" },
+      { date: dayAfter, label: "Послезавтра" },
+      { date: new Date(), label: "Другая дата...", isCustom: true },
+    ];
   };
 
   const handleSaveWorkSession = async () => {
@@ -345,11 +331,34 @@ export default function GoalsScreen() {
       return;
     }
 
+    if (contribution > earning) {
+      Alert.alert("Ошибка", "Сумма в цель не может превышать заработок");
+      return;
+    }
+
+    const activeGoals = goals.filter(g => g.currentAmount < g.targetAmount);
+    if (contribution > 0 && activeGoals.length > 1 && !selectedGoalId) {
+      Alert.alert("Выберите цель", "Укажите, в какую цель направить средства");
+      return;
+    }
+
+    const sessionDate = selectedDate.toDateString();
+    const existingSession = workSessions.find(s => 
+      new Date(s.date).toDateString() === sessionDate && s.shiftType === shiftType
+    );
+    
+    if (existingSession) {
+      Alert.alert("Ошибка", `У вас уже есть ${shiftType === "day" ? "дневная" : "ночная"} смена на эту дату`);
+      return;
+    }
+
     await storage.addWorkSession({
       date: selectedDate.toISOString(),
       operationType: workOperation,
+      shiftType: shiftType,
       plannedEarning: earning,
       plannedContribution: contribution,
+      goalId: selectedGoalId || undefined,
       isCompleted: false,
     });
 
@@ -358,6 +367,8 @@ export default function GoalsScreen() {
     setPlannedEarning("");
     setPlannedContribution("");
     setSelectedDate(new Date());
+    setShiftType("day");
+    setSelectedGoalId(null);
     await loadData();
   };
 
@@ -397,6 +408,8 @@ export default function GoalsScreen() {
               setPlannedEarning("");
               setPlannedContribution("");
               setSelectedDate(new Date());
+              setShiftType("day");
+              setSelectedGoalId(null);
             },
           },
         ]
@@ -789,6 +802,50 @@ export default function GoalsScreen() {
             </ScrollView>
 
             <ThemedText type="small" secondary style={styles.workLabel}>
+              Тип смены
+            </ThemedText>
+            <View style={styles.workOperationOptions}>
+              <Pressable
+                style={[
+                  styles.workOperationOption,
+                  shiftType === "day" && styles.workOperationOptionSelected
+                ]}
+                onPress={() => setShiftType("day")}
+              >
+                <MaterialCommunityIcons
+                  name="white-balance-sunny"
+                  size={20}
+                  color={shiftType === "day" ? Colors.light.buttonText : Colors.light.primary}
+                />
+                <ThemedText 
+                  type="small" 
+                  style={shiftType === "day" ? styles.workOperationTextSelected : undefined}
+                >
+                  Дневная
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.workOperationOption,
+                  shiftType === "night" && styles.workOperationOptionSelected
+                ]}
+                onPress={() => setShiftType("night")}
+              >
+                <MaterialCommunityIcons
+                  name="moon-waning-crescent"
+                  size={20}
+                  color={shiftType === "night" ? Colors.light.buttonText : Colors.light.textSecondary}
+                />
+                <ThemedText 
+                  type="small" 
+                  style={shiftType === "night" ? styles.workOperationTextSelected : undefined}
+                >
+                  Ночная
+                </ThemedText>
+              </Pressable>
+            </View>
+
+            <ThemedText type="small" secondary style={styles.workLabel}>
               Тип операции
             </ThemedText>
             <View style={styles.workOperationOptions}>
@@ -862,16 +919,52 @@ export default function GoalsScreen() {
               <ThemedText type="body" secondary> руб.</ThemedText>
             </View>
 
+            {(parseFloat(plannedContribution.replace(/[^\d.]/g, "")) || 0) > 0 && goals.filter(g => g.currentAmount < g.targetAmount).length > 1 && (
+              <>
+                <ThemedText type="small" secondary style={styles.workLabel}>
+                  В какую цель?
+                </ThemedText>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.goalSelectScroll}
+                  contentContainerStyle={styles.goalSelectContent}
+                >
+                  {goals.filter(g => g.currentAmount < g.targetAmount).map((goal) => {
+                    const isSelected = selectedGoalId === goal.id;
+                    return (
+                      <Pressable
+                        key={goal.id}
+                        style={[
+                          styles.goalSelectOption,
+                          isSelected && styles.goalSelectOptionSelected,
+                        ]}
+                        onPress={() => setSelectedGoalId(isSelected ? null : goal.id)}
+                      >
+                        <ThemedText 
+                          type="small" 
+                          style={isSelected ? styles.goalSelectTextSelected : undefined}
+                          numberOfLines={1}
+                        >
+                          {goal.name}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
+
             {plannedEarning && (
               <View style={styles.remainingFundsCard}>
                 <MaterialCommunityIcons
-                  name="wallet-outline"
+                  name="safe"
                   size={20}
-                  color={Colors.light.primary}
+                  color={Colors.light.safe}
                 />
                 <View style={styles.remainingFundsContent}>
                   <ThemedText type="small" secondary>
-                    Останется свободных средств
+                    Пойдёт в сейф
                   </ThemedText>
                   <ThemedText type="h4" style={styles.remainingFundsAmount}>
                     {formatCurrency(getRemainingFunds())} руб.
@@ -1373,6 +1466,27 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.primary,
   },
   workOperationTextSelected: {
+    color: Colors.light.buttonText,
+    fontWeight: "600",
+  },
+  goalSelectScroll: {
+    marginBottom: Spacing.md,
+  },
+  goalSelectContent: {
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+  },
+  goalSelectOption: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.light.backgroundSecondary,
+    maxWidth: 150,
+  },
+  goalSelectOptionSelected: {
+    backgroundColor: Colors.light.primary,
+  },
+  goalSelectTextSelected: {
     color: Colors.light.buttonText,
     fontWeight: "600",
   },
