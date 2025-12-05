@@ -39,7 +39,7 @@ function SettingRow({ icon, label, value, onPress, danger }: SettingRowProps) {
         <MaterialCommunityIcons
           name={icon as any}
           size={20}
-          color={danger ? Colors.dark.error : Colors.dark.primary}
+          color={danger ? Colors.light.error : Colors.light.primary}
         />
       </View>
       <ThemedText
@@ -53,7 +53,7 @@ function SettingRow({ icon, label, value, onPress, danger }: SettingRowProps) {
         <MaterialCommunityIcons
           name="chevron-right"
           size={20}
-          color={Colors.dark.textSecondary}
+          color={Colors.light.textSecondary}
         />
       ) : null}
     </Pressable>
@@ -176,7 +176,7 @@ export default function SettingsScreen() {
                 <MaterialCommunityIcons
                   name="account"
                   size={32}
-                  color={Colors.dark.textSecondary}
+                  color={Colors.light.textSecondary}
                 />
               </View>
               {isEditing ? (
@@ -186,7 +186,7 @@ export default function SettingsScreen() {
                     value={nameInput}
                     onChangeText={setNameInput}
                     placeholder="Ваше имя"
-                    placeholderTextColor={Colors.dark.textDisabled}
+                    placeholderTextColor={Colors.light.textDisabled}
                     autoFocus
                     onSubmitEditing={handleSaveName}
                     returnKeyType="done"
@@ -195,7 +195,7 @@ export default function SettingsScreen() {
                     <MaterialCommunityIcons
                       name="check"
                       size={20}
-                      color={Colors.dark.success}
+                      color={Colors.light.success}
                     />
                   </Pressable>
                 </View>
@@ -210,7 +210,7 @@ export default function SettingsScreen() {
                   <MaterialCommunityIcons
                     name="pencil"
                     size={16}
-                    color={Colors.dark.textSecondary}
+                    color={Colors.light.textSecondary}
                   />
                 </Pressable>
               )}
@@ -228,7 +228,7 @@ export default function SettingsScreen() {
                 <MaterialCommunityIcons
                   name="currency-rub"
                   size={20}
-                  color={Colors.dark.success}
+                  color={Colors.light.success}
                 />
               </View>
               <View style={styles.earningContent}>
@@ -240,7 +240,7 @@ export default function SettingsScreen() {
                       value={earningInput}
                       onChangeText={formatEarningInput}
                       placeholder="0"
-                      placeholderTextColor={Colors.dark.textDisabled}
+                      placeholderTextColor={Colors.light.textDisabled}
                       keyboardType="numeric"
                       autoFocus
                       onSubmitEditing={handleSaveEarning}
@@ -251,7 +251,7 @@ export default function SettingsScreen() {
                       <MaterialCommunityIcons
                         name="check"
                         size={20}
-                        color={Colors.dark.success}
+                        color={Colors.light.success}
                       />
                     </Pressable>
                   </View>
@@ -268,7 +268,7 @@ export default function SettingsScreen() {
                     <MaterialCommunityIcons
                       name="pencil"
                       size={16}
-                      color={Colors.dark.textSecondary}
+                      color={Colors.light.textSecondary}
                     />
                   </Pressable>
                 )}
@@ -293,13 +293,13 @@ export default function SettingsScreen() {
                   value={settings.notificationsEnabled}
                   onValueChange={handleToggleNotifications}
                   trackColor={{
-                    false: Colors.dark.backgroundSecondary,
-                    true: Colors.dark.primaryLight,
+                    false: Colors.light.backgroundSecondary,
+                    true: Colors.light.primaryLight,
                   }}
                   thumbColor={
                     settings.notificationsEnabled
-                      ? Colors.dark.primary
-                      : Colors.dark.textSecondary
+                      ? Colors.light.primary
+                      : Colors.light.textSecondary
                   }
                 />
               }
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.backgroundSecondary,
     justifyContent: "center",
     alignItems: "center",
     marginRight: Spacing.md,
@@ -413,9 +413,9 @@ const styles = StyleSheet.create({
   nameInput: {
     flex: 1,
     fontSize: 18,
-    color: Colors.dark.text,
+    color: Colors.light.text,
     padding: Spacing.sm,
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.backgroundSecondary,
     borderRadius: BorderRadius.sm,
   },
   saveButton: {
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.backgroundSecondary,
     justifyContent: "center",
     alignItems: "center",
     marginRight: Spacing.sm,
@@ -453,10 +453,10 @@ const styles = StyleSheet.create({
   earningInput: {
     fontSize: 18,
     fontWeight: "600",
-    color: Colors.dark.success,
+    color: Colors.light.success,
     padding: Spacing.xs,
     paddingHorizontal: Spacing.sm,
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.backgroundSecondary,
     borderRadius: BorderRadius.sm,
     minWidth: 100,
   },
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   earningAmount: {
-    color: Colors.dark.success,
+    color: Colors.light.success,
   },
   settingRow: {
     flexDirection: "row",
@@ -475,13 +475,13 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   settingRowPressed: {
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.backgroundSecondary,
   },
   settingIcon: {
     width: 36,
     height: 36,
     borderRadius: BorderRadius.sm,
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.backgroundSecondary,
     justifyContent: "center",
     alignItems: "center",
     marginRight: Spacing.sm,
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   settingLabelDanger: {
-    color: Colors.dark.error,
+    color: Colors.light.error,
   },
   archiveCount: {
     marginRight: Spacing.sm,

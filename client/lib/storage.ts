@@ -1,15 +1,22 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Goal, Contribution, AppSettings, WorkSession } from "./types";
+import { Goal, Contribution, AppSettings, WorkSession, Safe, SafeTransaction } from "./types";
 
 const GOALS_KEY = "@kopilka_goals";
 const CONTRIBUTIONS_KEY = "@kopilka_contributions";
 const SETTINGS_KEY = "@kopilka_settings";
 const WORK_SESSIONS_KEY = "@kopilka_work_sessions";
+const SAFE_KEY = "@kopilka_safe";
+const SAFE_TRANSACTIONS_KEY = "@kopilka_safe_transactions";
 
 const defaultSettings: AppSettings = {
   userName: "",
   notificationsEnabled: false,
   averageDailyEarning: 0,
+};
+
+const defaultSafe: Safe = {
+  balance: 0,
+  updatedAt: new Date().toISOString(),
 };
 
 export const storage = {
@@ -206,7 +213,14 @@ export const storage = {
 
   async clearAllData(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove([GOALS_KEY, CONTRIBUTIONS_KEY, SETTINGS_KEY, WORK_SESSIONS_KEY]);
+      await AsyncStorage.multiRemove([
+        GOALS_KEY, 
+        CONTRIBUTIONS_KEY, 
+        SETTINGS_KEY, 
+        WORK_SESSIONS_KEY,
+        SAFE_KEY,
+        SAFE_TRANSACTIONS_KEY,
+      ]);
     } catch (error) {
       console.error("Error clearing data:", error);
     }
@@ -271,5 +285,118 @@ export const storage = {
       sessionDate.setHours(0, 0, 0, 0);
       return sessionDate >= today && !s.isCompleted;
     }) || null;
+  },
+
+  async getActiveWorkSessions(): Promise<WorkSession[]> {
+    const sessions = await this.getWorkSessions();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return sessions.filter((s) => {
+      const sessionDate = new Date(s.date);
+      sessionDate.setHours(0, 0, 0, 0);
+      return sessionDate >= today && !s.isCompleted;
+    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  },
+
+  async getSafe(): Promise<Safe> {
+    try {
+      const data = await AsyncStorage.getItem(SAFE_KEY);
+      return data ? JSON.parse(data) : defaultSafe;
+    } catch (error) {
+      console.error("Error reading safe:", error);
+      return defaultSafe;
+    }
+  },
+
+  async saveSafe(safe: Safe): Promise<void> {
+    try {
+      await AsyncStorage.setItem(SAFE_KEY, JSON.stringify(safe));
+    } catch (error) {
+      console.error("Error saving safe:", error);
+    }
+  },
+
+  async getSafeTransactions(): Promise<SafeTransaction[]> {
+    try {
+      const data = await AsyncStorage.getItem(SAFE_TRANSACTIONS_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error("Error reading safe transactions:", error);
+      return [];
+    }
+  },
+
+  async saveSafeTransactions(transactions: SafeTransaction[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(SAFE_TRANSACTIONS_KEY, JSON.stringify(transactions));
+    } catch (error) {
+      console.error("Error saving safe transactions:", error);
+    }
+  },
+
+  async addToSafe(amount: number, note?: string): Promise<SafeTransaction> {
+    const safe = await this.getSafe();
+    safe.balance += amount;
+    safe.updatedAt = new Date().toISOString();
+    await this.saveSafe(safe);
+
+    const transactions = await this.getSafeTransactions();
+    const newTransaction: SafeTransaction = {
+      id: Date.now().toString(),
+      amount,
+      type: "deposit",
+      note,
+      date: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+    transactions.push(newTransaction);
+    await this.saveSafeTransactions(transactions);
+
+    return newTransaction;
+  },
+
+  async withdrawFromSafe(amount: number, goalId?: string, note?: string): Promise<SafeTransaction | null> {
+    const safe = await this.getSafe();
+    if (safe.balance < amount) return null;
+
+    safe.balance -= amount;
+    safe.updatedAt = new Date().toISOString();
+    await this.saveSafe(safe);
+
+    const transactions = await this.getSafeTransactions();
+    const newTransaction: SafeTransaction = {
+      id: Date.now().toString(),
+      amount,
+      type: "withdrawal",
+      note,
+      goalId,
+      date: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+    transactions.push(newTransaction);
+    await this.saveSafeTransactions(transactions);
+
+    if (goalId) {
+      await this.addContribution({
+        goalId,
+        amount,
+        note: note || "Пополнение из сейфа",
+        date: new Date().toISOString(),
+      });
+    }
+
+    return newTransaction;
+  },
+
+  async distributeFromSafe(distributions: { goalId: string; amount: number }[]): Promise<void> {
+    const safe = await this.getSafe();
+    const totalAmount = distributions.reduce((sum, d) => sum + d.amount, 0);
+    
+    if (safe.balance < totalAmount) return;
+
+    for (const dist of distributions) {
+      await this.withdrawFromSafe(dist.amount, dist.goalId, "Распределение из сейфа");
+    }
   },
 };

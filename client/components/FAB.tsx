@@ -41,7 +41,7 @@ export function FAB({ onPress, icon = "plus", style }: FABProps) {
       <MaterialCommunityIcons
         name={icon as any}
         size={28}
-        color={Colors.dark.buttonText}
+        color={Colors.light.buttonText}
       />
     </AnimatedPressable>
   );
@@ -53,13 +53,13 @@ const styles = StyleSheet.create({
     width: Spacing.fabSize,
     height: Spacing.fabSize,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: Colors.light.primary,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
 });

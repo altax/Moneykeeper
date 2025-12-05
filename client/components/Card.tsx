@@ -8,8 +8,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/ThemedText";
-import { useTheme } from "@/hooks/useTheme";
-import { Spacing, BorderRadius } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 
 interface CardProps {
   elevation?: number;
@@ -28,22 +27,6 @@ const springConfig: WithSpringConfig = {
   energyThreshold: 0.001,
 };
 
-const getBackgroundColorForElevation = (
-  elevation: number,
-  theme: any,
-): string => {
-  switch (elevation) {
-    case 1:
-      return theme.backgroundDefault;
-    case 2:
-      return theme.backgroundSecondary;
-    case 3:
-      return theme.backgroundTertiary;
-    default:
-      return theme.backgroundRoot;
-  }
-};
-
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function Card({
@@ -54,10 +37,7 @@ export function Card({
   onPress,
   style,
 }: CardProps) {
-  const { theme } = useTheme();
   const scale = useSharedValue(1);
-
-  const cardBackgroundColor = getBackgroundColorForElevation(elevation, theme);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -78,9 +58,6 @@ export function Card({
       onPressOut={handlePressOut}
       style={[
         styles.card,
-        {
-          backgroundColor: cardBackgroundColor,
-        },
         animatedStyle,
         style,
       ]}
@@ -102,8 +79,14 @@ export function Card({
 
 const styles = StyleSheet.create({
   card: {
-    padding: Spacing.xl,
-    borderRadius: BorderRadius["2xl"],
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    backgroundColor: Colors.light.card,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardTitle: {
     marginBottom: Spacing.sm,

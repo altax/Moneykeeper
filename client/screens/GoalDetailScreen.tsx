@@ -21,7 +21,6 @@ import * as Haptics from "expo-haptics";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { CircularProgress } from "@/components/CircularProgress";
-import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
 import { ContributionItem } from "@/components/ContributionItem";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
@@ -98,7 +97,7 @@ export default function GoalDetailScreen() {
           <MaterialCommunityIcons
             name="pencil"
             size={22}
-            color={Colors.dark.text}
+            color={Colors.light.text}
           />
         </HeaderButton>
       ),
@@ -109,10 +108,6 @@ export default function GoalDetailScreen() {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
-  };
-
-  const handleAddContribution = () => {
-    navigation.navigate("AddContribution", { goalId });
   };
 
   const handleContributionPress = (contributionId: string) => {
@@ -175,6 +170,7 @@ export default function GoalDetailScreen() {
   const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
   const isCompleted = goal.currentAmount >= goal.targetAmount;
   const recentContributions = contributions.slice(0, 5);
+  const iconName = goal.icon || "target";
 
   const daysToGoal = settings?.averageDailyEarning && settings.averageDailyEarning > 0 && remaining > 0
     ? Math.ceil(remaining / settings.averageDailyEarning)
@@ -195,15 +191,28 @@ export default function GoalDetailScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={Colors.dark.primary}
+            tintColor={Colors.light.primary}
           />
         }
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.iconSection}>
+          <View style={[
+            styles.goalIconContainer,
+            isCompleted && styles.goalIconCompleted,
+          ]}>
+            <MaterialCommunityIcons
+              name={isCompleted ? "check-circle" : iconName as any}
+              size={48}
+              color={isCompleted ? Colors.light.success : Colors.light.primary}
+            />
+          </View>
+        </View>
+
         <View style={styles.progressSection}>
           <CircularProgress 
             percentage={percentage} 
-            color={isCompleted ? Colors.dark.success : undefined}
+            color={isCompleted ? Colors.light.success : undefined}
           />
           <View style={styles.amountDisplay}>
             <ThemedText type="h2" style={[
@@ -213,7 +222,7 @@ export default function GoalDetailScreen() {
               {formatCurrency(goal.currentAmount)}
             </ThemedText>
             <ThemedText type="body" secondary>
-              из {formatCurrency(goal.targetAmount)}
+              из {formatCurrency(goal.targetAmount)} руб.
             </ThemedText>
           </View>
         </View>
@@ -224,7 +233,7 @@ export default function GoalDetailScreen() {
               <MaterialCommunityIcons
                 name="party-popper"
                 size={32}
-                color={Colors.dark.success}
+                color={Colors.light.success}
               />
               <View style={styles.completedText}>
                 <ThemedText type="h4" style={styles.completedTitle}>
@@ -245,7 +254,7 @@ export default function GoalDetailScreen() {
               <MaterialCommunityIcons
                 name="archive-arrow-down"
                 size={18}
-                color={Colors.dark.success}
+                color={Colors.light.success}
               />
               <ThemedText type="small" style={styles.archiveButtonText}>
                 Переместить в архив
@@ -259,7 +268,7 @@ export default function GoalDetailScreen() {
                 <MaterialCommunityIcons
                   name="flag-checkered"
                   size={24}
-                  color={Colors.dark.warning}
+                  color={Colors.light.warning}
                 />
                 <View style={styles.remainingText}>
                   <ThemedText type="small" secondary>
@@ -278,7 +287,7 @@ export default function GoalDetailScreen() {
                   <MaterialCommunityIcons
                     name="calendar-clock"
                     size={24}
-                    color={Colors.dark.primary}
+                    color={Colors.light.primary}
                   />
                   <View style={styles.daysText}>
                     <ThemedText type="small" secondary>
@@ -301,7 +310,7 @@ export default function GoalDetailScreen() {
                   <MaterialCommunityIcons
                     name="information-outline"
                     size={24}
-                    color={Colors.dark.textSecondary}
+                    color={Colors.light.textSecondary}
                   />
                   <ThemedText type="small" secondary style={styles.daysHint}>
                     Укажите средний заработок в настройках для расчёта дней до цели
@@ -309,10 +318,6 @@ export default function GoalDetailScreen() {
                 </View>
               </Card>
             )}
-
-            <Button onPress={handleAddContribution} style={styles.addButton}>
-              Добавить накопление
-            </Button>
           </>
         )}
 
@@ -344,7 +349,7 @@ export default function GoalDetailScreen() {
               <MaterialCommunityIcons
                 name="archive-outline"
                 size={20}
-                color={Colors.dark.textSecondary}
+                color={Colors.light.textSecondary}
               />
               <ThemedText secondary>Переместить в архив</ThemedText>
             </Pressable>
@@ -354,7 +359,7 @@ export default function GoalDetailScreen() {
             <MaterialCommunityIcons
               name="delete-outline"
               size={20}
-              color={Colors.dark.error}
+              color={Colors.light.error}
             />
             <ThemedText style={styles.deleteText}>Удалить цель</ThemedText>
           </Pressable>
@@ -379,6 +384,21 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: Spacing.md,
   },
+  iconSection: {
+    alignItems: "center",
+    marginBottom: Spacing.md,
+  },
+  goalIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(0, 91, 255, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  goalIconCompleted: {
+    backgroundColor: "rgba(16, 185, 129, 0.1)",
+  },
   progressSection: {
     alignItems: "center",
     marginBottom: Spacing.lg,
@@ -388,15 +408,16 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
   },
   currentAmount: {
-    color: Colors.dark.primary,
+    color: Colors.light.primary,
   },
   currentAmountCompleted: {
-    color: Colors.dark.success,
+    color: Colors.light.success,
   },
   completedCard: {
     marginBottom: Spacing.md,
-    backgroundColor: "rgba(76, 175, 80, 0.08)",
-    borderColor: Colors.dark.success,
+    backgroundColor: "rgba(16, 185, 129, 0.08)",
+    borderWidth: 1,
+    borderColor: Colors.light.success,
   },
   completedContent: {
     flexDirection: "row",
@@ -408,7 +429,7 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.md,
   },
   completedTitle: {
-    color: Colors.dark.success,
+    color: Colors.light.success,
   },
   archiveButton: {
     flexDirection: "row",
@@ -417,13 +438,13 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     paddingVertical: Spacing.sm,
     borderRadius: BorderRadius.md,
-    backgroundColor: "rgba(76, 175, 80, 0.15)",
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
   },
   archiveButtonPressed: {
     opacity: 0.7,
   },
   archiveButtonText: {
-    color: Colors.dark.success,
+    color: Colors.light.success,
     fontWeight: "600",
   },
   remainingCard: {
@@ -437,7 +458,7 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.md,
   },
   remainingAmount: {
-    color: Colors.dark.warning,
+    color: Colors.light.warning,
   },
   daysCard: {
     marginBottom: Spacing.md,
@@ -456,20 +477,18 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   daysAmount: {
-    color: Colors.dark.primary,
+    color: Colors.light.primary,
   },
   daysLabel: {
-    color: Colors.dark.primary,
+    color: Colors.light.primary,
   },
   daysHint: {
     flex: 1,
     marginLeft: Spacing.sm,
   },
-  addButton: {
-    marginBottom: Spacing.lg,
-  },
   historySection: {
     marginBottom: Spacing.lg,
+    marginTop: Spacing.md,
   },
   sectionHeader: {
     flexDirection: "row",
@@ -498,7 +517,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
   },
   deleteText: {
-    color: Colors.dark.error,
+    color: Colors.light.error,
     marginLeft: Spacing.xs,
   },
 });

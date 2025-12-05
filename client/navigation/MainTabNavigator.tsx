@@ -4,12 +4,15 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Platform, StyleSheet } from "react-native";
 import GoalsStackNavigator from "@/navigation/GoalsStackNavigator";
+import SafeStackNavigator from "@/navigation/SafeStackNavigator";
 import HistoryStackNavigator from "@/navigation/HistoryStackNavigator";
 import SettingsStackNavigator from "@/navigation/SettingsStackNavigator";
 import { useTheme } from "@/hooks/useTheme";
+import { Colors } from "@/constants/theme";
 
 export type MainTabParamList = {
   GoalsTab: undefined;
+  SafeTab: undefined;
   HistoryTab: undefined;
   SettingsTab: undefined;
 };
@@ -28,17 +31,23 @@ export default function MainTabNavigator() {
         tabBarStyle: {
           position: "absolute",
           backgroundColor: Platform.select({
-            ios: "transparent",
-            android: theme.backgroundRoot,
+            ios: "rgba(255, 255, 255, 0.95)",
+            android: Colors.light.backgroundRoot,
+            web: Colors.light.backgroundRoot,
           }),
-          borderTopWidth: 0,
+          borderTopWidth: 1,
+          borderTopColor: Colors.light.border,
           elevation: 0,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 8,
         },
         tabBarBackground: () =>
           Platform.OS === "ios" ? (
             <BlurView
               intensity={100}
-              tint={isDark ? "dark" : "light"}
+              tint="light"
               style={StyleSheet.absoluteFill}
             />
           ) : null,
@@ -52,6 +61,16 @@ export default function MainTabNavigator() {
           title: "Цели",
           tabBarIcon: ({ color, size }) => (
             <MaterialCommunityIcons name="target" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="SafeTab"
+        component={SafeStackNavigator}
+        options={{
+          title: "Сейф",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="safe" size={size} color={color} />
           ),
         }}
       />

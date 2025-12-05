@@ -157,7 +157,7 @@ export default function HistoryScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={Colors.dark.primary}
+            tintColor={Colors.light.primary}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -166,7 +166,7 @@ export default function HistoryScreen() {
           <MaterialCommunityIcons
             name="chart-timeline-variant"
             size={24}
-            color={Colors.dark.primary}
+            color={Colors.light.primary}
           />
           <View style={styles.summaryContent}>
             <ThemedText type="small" secondary>Всего накоплено</ThemedText>
@@ -201,7 +201,7 @@ export default function HistoryScreen() {
                   <MaterialCommunityIcons
                     name={isCompleted ? "check-circle" : "target"}
                     size={20}
-                    color={isCompleted ? Colors.dark.success : Colors.dark.primary}
+                    color={isCompleted ? Colors.light.success : Colors.light.primary}
                   />
                 </View>
                 <View style={styles.goalInfo}>
@@ -228,13 +228,13 @@ export default function HistoryScreen() {
                   <MaterialCommunityIcons
                     name="eye-outline"
                     size={20}
-                    color={Colors.dark.primary}
+                    color={Colors.light.primary}
                   />
                 </Pressable>
                 <MaterialCommunityIcons
                   name={isExpanded ? "chevron-up" : "chevron-down"}
                   size={24}
-                  color={Colors.dark.textSecondary}
+                  color={Colors.light.textSecondary}
                 />
               </Pressable>
 
@@ -279,7 +279,7 @@ export default function HistoryScreen() {
           <MaterialCommunityIcons
             name="information-outline"
             size={18}
-            color={Colors.dark.textSecondary}
+            color={Colors.light.textSecondary}
           />
           <ThemedText type="small" secondary style={styles.infoText}>
             История накоплений доступна только для просмотра. Редактировать суммы можно в карточке цели.
@@ -323,28 +323,38 @@ const styles = StyleSheet.create({
   summaryCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.dark.backgroundDefault,
+    backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.dark.primary,
+    borderColor: Colors.light.primary,
     gap: Spacing.sm,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   summaryContent: {
     flex: 1,
   },
   summaryAmount: {
-    color: Colors.dark.primary,
+    color: Colors.light.primary,
   },
   summaryStats: {
     alignItems: "flex-end",
   },
   goalSection: {
-    backgroundColor: Colors.dark.backgroundDefault,
+    backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.lg,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.light.border,
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   goalHeader: {
     flexDirection: "row",
@@ -356,12 +366,12 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: BorderRadius.md,
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.backgroundSecondary,
     justifyContent: "center",
     alignItems: "center",
   },
   goalIconContainerCompleted: {
-    backgroundColor: "rgba(76, 175, 80, 0.15)",
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
   },
   goalInfo: {
     flex: 1,
@@ -378,13 +388,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   goalAmount: {
-    color: Colors.dark.primary,
+    color: Colors.light.primary,
   },
   viewGoalButton: {
     width: 32,
     height: 32,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.backgroundSecondary,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -392,7 +402,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingBottom: Spacing.md,
     borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
+    borderTopColor: Colors.light.border,
   },
   contributionItem: {
     flexDirection: "row",
@@ -410,13 +420,13 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Colors.dark.success,
+    backgroundColor: Colors.light.success,
     marginTop: 4,
   },
   timelineLine: {
     flex: 1,
     width: 2,
-    backgroundColor: Colors.dark.border,
+    backgroundColor: Colors.light.border,
     marginTop: 4,
   },
   contributionContent: {
@@ -429,7 +439,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   contributionAmount: {
-    color: Colors.dark.success,
+    color: Colors.light.success,
     fontWeight: "600",
   },
   contributionNote: {
@@ -439,7 +449,7 @@ const styles = StyleSheet.create({
   infoCard: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.backgroundSecondary,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     gap: Spacing.sm,

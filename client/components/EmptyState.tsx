@@ -26,7 +26,7 @@ export function EmptyState({
         <MaterialCommunityIcons
           name={icon as any}
           size={64}
-          color={Colors.dark.textDisabled}
+          color={Colors.light.textDisabled}
         />
       </View>
       <ThemedText type="h3" style={styles.title}>

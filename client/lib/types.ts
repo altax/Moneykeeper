@@ -3,6 +3,7 @@ export interface Goal {
   name: string;
   targetAmount: number;
   currentAmount: number;
+  icon?: string;
   createdAt: string;
   updatedAt: string;
   isArchived?: boolean;
@@ -35,4 +36,19 @@ export interface AppSettings {
   userName: string;
   notificationsEnabled: boolean;
   averageDailyEarning: number;
+}
+
+export interface Safe {
+  balance: number;
+  updatedAt: string;
+}
+
+export interface SafeTransaction {
+  id: string;
+  amount: number;
+  type: "deposit" | "withdrawal";
+  note?: string;
+  goalId?: string;
+  date: string;
+  createdAt: string;
 }

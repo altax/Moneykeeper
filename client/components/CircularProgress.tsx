@@ -41,7 +41,7 @@ export function CircularProgress({
   }));
 
   const displayPercentage = Math.min(Math.round(percentage), 100);
-  const strokeColor = color || Colors.dark.primary;
+  const strokeColor = color || Colors.light.primary;
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
@@ -50,7 +50,7 @@ export function CircularProgress({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={Colors.dark.backgroundSecondary}
+          stroke={Colors.light.backgroundSecondary}
           strokeWidth={strokeWidth}
           fill="none"
         />

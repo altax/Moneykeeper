@@ -54,6 +54,8 @@ export function GoalCard({ goal, onPress, onQuickAdd, daysToGoal }: GoalCardProp
     onQuickAdd?.();
   };
 
+  const iconName = goal.icon || "target";
+
   return (
     <AnimatedPressable
       onPress={onPress}
@@ -71,9 +73,9 @@ export function GoalCard({ goal, onPress, onQuickAdd, daysToGoal }: GoalCardProp
           isCompleted && styles.iconContainerCompleted,
         ]}>
           <MaterialCommunityIcons
-            name={isCompleted ? "check-circle" : "target"}
+            name={isCompleted ? "check-circle" : iconName as any}
             size={24}
-            color={isCompleted ? Colors.dark.success : Colors.dark.primary}
+            color={isCompleted ? Colors.light.success : Colors.light.primary}
           />
         </View>
         <View style={styles.titleContainer}>
@@ -102,14 +104,14 @@ export function GoalCard({ goal, onPress, onQuickAdd, daysToGoal }: GoalCardProp
             <MaterialCommunityIcons
               name="plus"
               size={20}
-              color={Colors.dark.primary}
+              color={Colors.light.primary}
             />
           </Pressable>
         ) : null}
         <MaterialCommunityIcons
           name="chevron-right"
           size={24}
-          color={Colors.dark.textSecondary}
+          color={Colors.light.textSecondary}
         />
       </View>
 
@@ -127,7 +129,7 @@ export function GoalCard({ goal, onPress, onQuickAdd, daysToGoal }: GoalCardProp
 
       <ProgressBar 
         percentage={percentage} 
-        color={isCompleted ? Colors.dark.success : undefined}
+        color={isCompleted ? Colors.light.success : undefined}
         dynamicColor={!isCompleted}
       />
 
@@ -137,9 +139,9 @@ export function GoalCard({ goal, onPress, onQuickAdd, daysToGoal }: GoalCardProp
             <MaterialCommunityIcons
               name="flag-outline"
               size={16}
-              color={Colors.dark.warning}
+              color={Colors.light.warning}
             />
-            <ThemedText type="small" secondary style={styles.remainingText}>
+            <ThemedText type="small" style={styles.remainingText}>
               Осталось: {formatCurrency(remaining)} руб.
             </ThemedText>
           </View>
@@ -148,7 +150,7 @@ export function GoalCard({ goal, onPress, onQuickAdd, daysToGoal }: GoalCardProp
               <MaterialCommunityIcons
                 name="calendar-clock"
                 size={14}
-                color={Colors.dark.textSecondary}
+                color={Colors.light.textSecondary}
               />
               <ThemedText type="caption" secondary>
                 {daysToGoal} {getDaysWord(daysToGoal)}
@@ -179,15 +181,20 @@ function getDaysWord(days: number): string {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.dark.backgroundDefault,
+    backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
+    marginBottom: Spacing.md,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardCompleted: {
-    borderColor: Colors.dark.success,
-    backgroundColor: "rgba(76, 175, 80, 0.05)",
+    borderWidth: 1,
+    borderColor: Colors.light.success,
+    backgroundColor: "rgba(16, 185, 129, 0.05)",
   },
   header: {
     flexDirection: "row",
@@ -198,31 +205,31 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: BorderRadius.md,
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.backgroundSecondary,
     justifyContent: "center",
     alignItems: "center",
     marginRight: Spacing.sm,
   },
   iconContainerCompleted: {
-    backgroundColor: "rgba(76, 175, 80, 0.15)",
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
   },
   titleContainer: {
     flex: 1,
   },
   completedText: {
-    color: Colors.dark.success,
+    color: Colors.light.success,
   },
   quickAddButton: {
     width: 36,
     height: 36,
     borderRadius: BorderRadius.full,
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.backgroundSecondary,
     justifyContent: "center",
     alignItems: "center",
     marginRight: Spacing.sm,
   },
   quickAddButtonPressed: {
-    backgroundColor: Colors.dark.primaryLight,
+    backgroundColor: Colors.light.primaryLight,
   },
   amountContainer: {
     flexDirection: "row",
@@ -230,10 +237,10 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   currentAmount: {
-    color: Colors.dark.primary,
+    color: Colors.light.primary,
   },
   currentAmountCompleted: {
-    color: Colors.dark.success,
+    color: Colors.light.success,
   },
   remainingRow: {
     flexDirection: "row",
@@ -242,7 +249,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
+    borderTopColor: Colors.light.border,
   },
   remainingInfo: {
     flexDirection: "row",
@@ -250,7 +257,7 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
   },
   remainingText: {
-    color: Colors.dark.warning,
+    color: Colors.light.warning,
   },
   daysInfo: {
     flexDirection: "row",

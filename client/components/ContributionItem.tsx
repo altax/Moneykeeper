@@ -71,7 +71,7 @@ export function ContributionItem({
         <MaterialCommunityIcons
           name="plus-circle"
           size={24}
-          color={Colors.dark.success}
+          color={Colors.light.success}
         />
       </View>
       <View style={styles.content}>
@@ -88,7 +88,7 @@ export function ContributionItem({
             <MaterialCommunityIcons
               name="target"
               size={14}
-              color={Colors.dark.primary}
+              color={Colors.light.primary}
             />
             <ThemedText type="small" style={styles.goalName} numberOfLines={1}>
               {goal.name}
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
-    backgroundColor: Colors.dark.backgroundDefault,
+    backgroundColor: Colors.light.backgroundSecondary,
     borderRadius: BorderRadius.md,
   },
   iconContainer: {
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   amount: {
-    color: Colors.dark.success,
+    color: Colors.light.success,
     fontWeight: "600",
   },
   goalRow: {
@@ -135,14 +135,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 4,
     marginTop: 4,
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.card,
     paddingHorizontal: Spacing.xs,
     paddingVertical: 2,
     borderRadius: BorderRadius.sm,
     alignSelf: "flex-start",
   },
   goalName: {
-    color: Colors.dark.primary,
+    color: Colors.light.primary,
   },
   note: {
     marginTop: 4,

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { StyleSheet, ScrollView, View, RefreshControl, Modal, TextInput, Pressable, FlatList } from "react-native";
+import { StyleSheet, ScrollView, View, RefreshControl, Modal, TextInput, Pressable, FlatList, Alert } from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -19,6 +19,30 @@ import { GoalsStackParamList } from "@/navigation/GoalsStackNavigator";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList & GoalsStackParamList>;
 
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("ru-RU", {
+    style: "decimal",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function getGoalsWord(count: number): string {
+  const lastTwo = count % 100;
+  const lastOne = count % 10;
+  
+  if (lastTwo >= 11 && lastTwo <= 19) {
+    return "целей";
+  }
+  if (lastOne === 1) {
+    return "цель";
+  }
+  if (lastOne >= 2 && lastOne <= 4) {
+    return "цели";
+  }
+  return "целей";
+}
+
 export default function GoalsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const headerHeight = useHeaderHeight();
@@ -35,9 +59,9 @@ export default function GoalsScreen() {
   const [mainGoalId, setMainGoalId] = useState<string | null>(null);
   const [otherGoals, setOtherGoals] = useState<Goal[]>([]);
   
-  const [workSession, setWorkSession] = useState<WorkSession | null>(null);
+  const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
   const [showWorkModal, setShowWorkModal] = useState(false);
-  const [workDate, setWorkDate] = useState<string>("today");
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [workOperation, setWorkOperation] = useState<WorkOperationType>("reception");
   const [plannedEarning, setPlannedEarning] = useState("");
   const [plannedContribution, setPlannedContribution] = useState("");
@@ -56,8 +80,8 @@ export default function GoalsScreen() {
     const appSettings = await storage.getSettings();
     setSettings(appSettings);
     
-    const activeWorkSession = await storage.getActiveWorkSession();
-    setWorkSession(activeWorkSession);
+    const activeSessions = await storage.getActiveWorkSessions();
+    setWorkSessions(activeSessions);
   }, []);
 
   useFocusEffect(
@@ -114,18 +138,6 @@ export default function GoalsScreen() {
         g.currentAmount < g.targetAmount
       );
       
-      if (availableGoals.length === 0) {
-        await storage.addContribution({
-          goalId: quickAddGoal.id,
-          amount: remaining,
-          date: new Date().toISOString(),
-        });
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setQuickAddGoal(null);
-        await loadData();
-        return;
-      }
-      
       setMainGoalId(quickAddGoal.id);
       setMainContribution(remaining);
       setOverflowAmount(overflow);
@@ -159,6 +171,7 @@ export default function GoalsScreen() {
 
     const targetRemaining = targetGoal.targetAmount - targetGoal.currentAmount;
     const transferAmount = Math.min(overflowAmount, targetRemaining);
+    const remainingOverflow = overflowAmount - transferAmount;
 
     await storage.addContribution({
       goalId: targetGoal.id,
@@ -166,6 +179,10 @@ export default function GoalsScreen() {
       date: new Date().toISOString(),
       note: "Перенос излишка",
     });
+
+    if (remainingOverflow > 0) {
+      await storage.addToSafe(remainingOverflow, "Излишек от накопления");
+    }
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setOverflowModal(false);
@@ -176,7 +193,7 @@ export default function GoalsScreen() {
     await loadData();
   };
 
-  const handleSkipOverflow = async () => {
+  const handleSendToSafe = async () => {
     if (mainGoalId && mainContribution > 0) {
       await storage.addContribution({
         goalId: mainGoalId,
@@ -184,6 +201,8 @@ export default function GoalsScreen() {
         date: new Date().toISOString(),
       });
     }
+
+    await storage.addToSafe(overflowAmount, "Излишек от накопления");
     
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setOverflowModal(false);
@@ -204,27 +223,33 @@ export default function GoalsScreen() {
     setter(number.toLocaleString("ru-RU"));
   };
 
-  const getWorkDateLabel = (date: string): string => {
-    switch (date) {
-      case "today": return "Сегодня";
-      case "tomorrow": return "Завтра";
-      case "dayAfterTomorrow": return "Послезавтра";
-      default: return date;
+  const getDateOptions = (): { date: Date; label: string }[] => {
+    const options: { date: Date; label: string }[] = [];
+    const today = new Date();
+    
+    for (let i = 0; i < 14; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      
+      let label = "";
+      if (i === 0) {
+        label = "Сегодня";
+      } else if (i === 1) {
+        label = "Завтра";
+      } else if (i === 2) {
+        label = "Послезавтра";
+      } else {
+        label = date.toLocaleDateString("ru-RU", { 
+          day: "numeric", 
+          month: "short",
+          weekday: "short" 
+        });
+      }
+      
+      options.push({ date, label });
     }
-  };
-
-  const getWorkDateValue = (date: string): Date => {
-    const now = new Date();
-    switch (date) {
-      case "today": return now;
-      case "tomorrow": 
-        now.setDate(now.getDate() + 1);
-        return now;
-      case "dayAfterTomorrow":
-        now.setDate(now.getDate() + 2);
-        return now;
-      default: return now;
-    }
+    
+    return options;
   };
 
   const handleSaveWorkSession = async () => {
@@ -237,7 +262,7 @@ export default function GoalsScreen() {
     }
 
     await storage.addWorkSession({
-      date: getWorkDateValue(workDate).toISOString(),
+      date: selectedDate.toISOString(),
       operationType: workOperation,
       plannedEarning: earning,
       plannedContribution: contribution,
@@ -248,15 +273,27 @@ export default function GoalsScreen() {
     setShowWorkModal(false);
     setPlannedEarning("");
     setPlannedContribution("");
+    setSelectedDate(new Date());
     await loadData();
   };
 
-  const handleClearWorkSession = async () => {
-    if (workSession) {
-      await storage.deleteWorkSession(workSession.id);
-      setWorkSession(null);
-      await loadData();
-    }
+  const handleCancelWorkSession = (session: WorkSession) => {
+    Alert.alert(
+      "Отменить запись?",
+      "Вы уверены, что хотите отменить эту запись на работу?",
+      [
+        { text: "Нет", style: "cancel" },
+        {
+          text: "Да, отменить",
+          style: "destructive",
+          onPress: async () => {
+            await storage.deleteWorkSession(session.id);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            await loadData();
+          },
+        },
+      ]
+    );
   };
 
   const calculateDaysToGoal = (goal: Goal): number | null => {
@@ -280,6 +317,20 @@ export default function GoalsScreen() {
     } else {
       return "Молодец! Регулярность — ключ к успеху!";
     }
+  };
+
+  const getRemainingFunds = (): number => {
+    const earning = parseFloat(plannedEarning.replace(/[^\d.]/g, "")) || 0;
+    const contribution = parseFloat(plannedContribution.replace(/[^\d.]/g, "")) || 0;
+    return Math.max(0, earning - contribution);
+  };
+
+  const getTotalPlannedEarnings = (): number => {
+    return workSessions.reduce((sum, s) => sum + s.plannedEarning, 0);
+  };
+
+  const getTotalPlannedContributions = (): number => {
+    return workSessions.reduce((sum, s) => sum + s.plannedContribution, 0);
   };
 
   return (
@@ -311,7 +362,7 @@ export default function GoalsScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor={Colors.dark.primary}
+              tintColor={Colors.light.primary}
             />
           }
           showsVerticalScrollIndicator={false}
@@ -322,7 +373,7 @@ export default function GoalsScreen() {
                 <MaterialCommunityIcons
                   name="piggy-bank"
                   size={24}
-                  color={Colors.dark.primary}
+                  color={Colors.light.primary}
                 />
               </View>
               <ThemedText type="h3">{greeting}</ThemedText>
@@ -332,66 +383,82 @@ export default function GoalsScreen() {
             </ThemedText>
           </View>
 
-          {workSession ? (
-            <Pressable style={styles.workCard} onPress={handleClearWorkSession}>
-              <View style={styles.workCardHeader}>
-                <View style={styles.workIconContainer}>
+          {workSessions.length > 0 ? (
+            <View style={styles.workSessionsContainer}>
+              <View style={styles.workSessionsHeader}>
+                <ThemedText type="h4">Запланированные смены</ThemedText>
+                <Pressable onPress={() => setShowWorkModal(true)}>
                   <MaterialCommunityIcons
-                    name={workSession.operationType === "reception" ? "package-variant" : "package-variant-closed-remove"}
+                    name="plus-circle"
                     size={24}
-                    color={Colors.dark.primary}
+                    color={Colors.light.primary}
                   />
-                </View>
-                <View style={styles.workCardContent}>
-                  <ThemedText type="bodyLarge" style={styles.workTitle}>
-                    {workSession.operationType === "reception" ? "Приёмка" : "Возвраты"}
-                  </ThemedText>
-                  <ThemedText type="small" secondary>
-                    {new Date(workSession.date).toLocaleDateString("ru-RU", { 
-                      day: "numeric", 
-                      month: "long" 
-                    })}
-                  </ThemedText>
-                </View>
-                <MaterialCommunityIcons
-                  name="close"
-                  size={20}
-                  color={Colors.dark.textSecondary}
-                />
+                </Pressable>
               </View>
-              <View style={styles.workCardDetails}>
-                <View style={styles.workStat}>
-                  <ThemedText type="caption" secondary>Планируемый заработок</ThemedText>
-                  <ThemedText type="h4" style={styles.workAmount}>
-                    {workSession.plannedEarning.toLocaleString("ru-RU")} руб.
-                  </ThemedText>
-                </View>
-                {workSession.plannedContribution > 0 ? (
-                  <View style={styles.workStat}>
-                    <ThemedText type="caption" secondary>Вложу в цель</ThemedText>
-                    <ThemedText type="h4" style={styles.workContribution}>
-                      {workSession.plannedContribution.toLocaleString("ru-RU")} руб.
+              
+              {workSessions.length > 1 && (
+                <View style={styles.totalStats}>
+                  <View style={styles.totalStat}>
+                    <ThemedText type="caption" secondary>Всего заработок</ThemedText>
+                    <ThemedText type="body" style={styles.totalAmount}>
+                      {formatCurrency(getTotalPlannedEarnings())} руб.
                     </ThemedText>
                   </View>
-                ) : null}
-              </View>
-              <View style={styles.encouragementContainer}>
-                <MaterialCommunityIcons
-                  name="star"
-                  size={16}
-                  color={Colors.dark.warning}
-                />
-                <ThemedText type="small" style={styles.encouragementText}>
-                  {getEncouragementMessage(workSession.plannedEarning)}
-                </ThemedText>
-              </View>
-            </Pressable>
+                  <View style={styles.totalStat}>
+                    <ThemedText type="caption" secondary>Всего вложу</ThemedText>
+                    <ThemedText type="body" style={styles.totalContribution}>
+                      {formatCurrency(getTotalPlannedContributions())} руб.
+                    </ThemedText>
+                  </View>
+                </View>
+              )}
+
+              {workSessions.map((session) => (
+                <Pressable
+                  key={session.id}
+                  style={styles.workCard}
+                  onPress={() => handleCancelWorkSession(session)}
+                >
+                  <View style={styles.workCardHeader}>
+                    <View style={styles.workIconContainer}>
+                      <MaterialCommunityIcons
+                        name={session.operationType === "reception" ? "package-variant" : "package-variant-closed-remove"}
+                        size={20}
+                        color={Colors.light.primary}
+                      />
+                    </View>
+                    <View style={styles.workCardContent}>
+                      <ThemedText type="body" style={styles.workTitle}>
+                        {session.operationType === "reception" ? "Приёмка" : "Возвраты"}
+                      </ThemedText>
+                      <ThemedText type="caption" secondary>
+                        {new Date(session.date).toLocaleDateString("ru-RU", { 
+                          day: "numeric", 
+                          month: "long",
+                          weekday: "short"
+                        })}
+                      </ThemedText>
+                    </View>
+                    <View style={styles.workAmounts}>
+                      <ThemedText type="small" style={styles.workEarning}>
+                        +{formatCurrency(session.plannedEarning)}
+                      </ThemedText>
+                      {session.plannedContribution > 0 && (
+                        <ThemedText type="caption" style={styles.workContrib}>
+                          -{formatCurrency(session.plannedContribution)} на цель
+                        </ThemedText>
+                      )}
+                    </View>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
           ) : (
             <Pressable style={styles.workPromptCard} onPress={() => setShowWorkModal(true)}>
               <MaterialCommunityIcons
                 name="briefcase-plus-outline"
                 size={24}
-                color={Colors.dark.primary}
+                color={Colors.light.primary}
               />
               <View style={styles.workPromptContent}>
                 <ThemedText type="body">Планируете выйти на склад?</ThemedText>
@@ -402,7 +469,7 @@ export default function GoalsScreen() {
               <MaterialCommunityIcons
                 name="chevron-right"
                 size={24}
-                color={Colors.dark.textSecondary}
+                color={Colors.light.textSecondary}
               />
             </Pressable>
           )}
@@ -444,7 +511,7 @@ export default function GoalsScreen() {
               </ThemedText>
               {quickAddGoal && (
                 <ThemedText type="small" secondary style={styles.remainingHint}>
-                  Максимум: {(quickAddGoal.targetAmount - quickAddGoal.currentAmount).toLocaleString("ru-RU")} руб.
+                  Максимум: {formatCurrency(quickAddGoal.targetAmount - quickAddGoal.currentAmount)} руб.
                 </ThemedText>
               )}
             </View>
@@ -455,7 +522,7 @@ export default function GoalsScreen() {
                 value={quickAddAmount}
                 onChangeText={formatQuickAmount}
                 placeholder="0"
-                placeholderTextColor={Colors.dark.textDisabled}
+                placeholderTextColor={Colors.light.textDisabled}
                 keyboardType="numeric"
                 autoFocus
                 onSubmitEditing={handleQuickAddSubmit}
@@ -486,56 +553,62 @@ export default function GoalsScreen() {
         visible={overflowModal}
         transparent
         animationType="fade"
-        onRequestClose={handleSkipOverflow}
+        onRequestClose={() => {}}
       >
-        <Pressable 
-          style={styles.modalOverlay}
-          onPress={handleSkipOverflow}
-        >
-          <Pressable style={styles.overflowModalContent} onPress={() => {}}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.overflowModalContent}>
             <View style={styles.modalHeader}>
               <ThemedText type="h4">Излишек суммы</ThemedText>
               <ThemedText type="body" secondary>
-                У вас осталось {overflowAmount.toLocaleString("ru-RU")} руб.
+                У вас осталось {formatCurrency(overflowAmount)} руб.
               </ThemedText>
               <ThemedText type="small" secondary style={styles.overflowHint}>
-                Хотите перенести на другую цель?
+                Куда направить излишек?
               </ThemedText>
             </View>
             
-            <FlatList
-              data={otherGoals}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={styles.overflowGoalItem}
-                  onPress={() => handleOverflowTransfer(item)}
-                >
-                  <View style={styles.overflowGoalInfo}>
-                    <ThemedText type="body" numberOfLines={1}>{item.name}</ThemedText>
-                    <ThemedText type="small" secondary>
-                      Осталось: {(item.targetAmount - item.currentAmount).toLocaleString("ru-RU")} руб.
-                    </ThemedText>
-                  </View>
-                  <MaterialCommunityIcons
-                    name="arrow-right"
-                    size={24}
-                    color={Colors.dark.primary}
-                  />
-                </Pressable>
-              )}
-              style={styles.overflowGoalsList}
-              showsVerticalScrollIndicator={false}
-            />
+            {otherGoals.length > 0 && (
+              <FlatList
+                data={otherGoals}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <Pressable
+                    style={styles.overflowGoalItem}
+                    onPress={() => handleOverflowTransfer(item)}
+                  >
+                    <View style={styles.overflowGoalInfo}>
+                      <ThemedText type="body" numberOfLines={1}>{item.name}</ThemedText>
+                      <ThemedText type="small" secondary>
+                        Осталось: {formatCurrency(item.targetAmount - item.currentAmount)} руб.
+                      </ThemedText>
+                    </View>
+                    <MaterialCommunityIcons
+                      name="arrow-right"
+                      size={24}
+                      color={Colors.light.primary}
+                    />
+                  </Pressable>
+                )}
+                style={styles.overflowGoalsList}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
 
             <Pressable
-              onPress={handleSkipOverflow}
-              style={[styles.modalButton, styles.modalButtonCancel, styles.skipButton]}
+              onPress={handleSendToSafe}
+              style={styles.safeButton}
             >
-              <ThemedText type="body" secondary>Пропустить</ThemedText>
+              <MaterialCommunityIcons
+                name="safe"
+                size={20}
+                color={Colors.light.safe}
+              />
+              <ThemedText type="body" style={styles.safeButtonText}>
+                Отправить в сейф
+              </ThemedText>
             </Pressable>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
 
       <Modal
@@ -556,25 +629,33 @@ export default function GoalsScreen() {
               </ThemedText>
             </View>
 
-            <View style={styles.workDateOptions}>
-              {["today", "tomorrow", "dayAfterTomorrow"].map((date) => (
-                <Pressable
-                  key={date}
-                  style={[
-                    styles.workDateOption,
-                    workDate === date && styles.workDateOptionSelected
-                  ]}
-                  onPress={() => setWorkDate(date)}
-                >
-                  <ThemedText 
-                    type="small" 
-                    style={workDate === date ? styles.workDateTextSelected : undefined}
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.dateScroll}
+              contentContainerStyle={styles.dateScrollContent}
+            >
+              {getDateOptions().map(({ date, label }) => {
+                const isSelected = date.toDateString() === selectedDate.toDateString();
+                return (
+                  <Pressable
+                    key={date.toISOString()}
+                    style={[
+                      styles.dateOption,
+                      isSelected && styles.dateOptionSelected
+                    ]}
+                    onPress={() => setSelectedDate(date)}
                   >
-                    {getWorkDateLabel(date)}
-                  </ThemedText>
-                </Pressable>
-              ))}
-            </View>
+                    <ThemedText 
+                      type="small" 
+                      style={isSelected ? styles.dateTextSelected : undefined}
+                    >
+                      {label}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
 
             <ThemedText type="small" secondary style={styles.workLabel}>
               Тип операции
@@ -590,7 +671,7 @@ export default function GoalsScreen() {
                 <MaterialCommunityIcons
                   name="package-variant"
                   size={20}
-                  color={workOperation === "reception" ? Colors.dark.buttonText : Colors.dark.primary}
+                  color={workOperation === "reception" ? Colors.light.buttonText : Colors.light.primary}
                 />
                 <ThemedText 
                   type="small" 
@@ -609,7 +690,7 @@ export default function GoalsScreen() {
                 <MaterialCommunityIcons
                   name="package-variant-closed-remove"
                   size={20}
-                  color={workOperation === "returns" ? Colors.dark.buttonText : Colors.dark.warning}
+                  color={workOperation === "returns" ? Colors.light.buttonText : Colors.light.warning}
                 />
                 <ThemedText 
                   type="small" 
@@ -627,28 +708,46 @@ export default function GoalsScreen() {
               <TextInput
                 style={styles.workInput}
                 value={plannedEarning}
-                onChangeText={(t) => formatWorkAmount(t, setPlannedEarning)}
+                onChangeText={(text) => formatWorkAmount(text, setPlannedEarning)}
                 placeholder="0"
-                placeholderTextColor={Colors.dark.textDisabled}
+                placeholderTextColor={Colors.light.textDisabled}
                 keyboardType="numeric"
               />
-              <ThemedText type="body" secondary>руб.</ThemedText>
+              <ThemedText type="body" secondary> руб.</ThemedText>
             </View>
 
             <ThemedText type="small" secondary style={styles.workLabel}>
-              Сколько хотите вложить в цель?
+              Сколько вложите в цель?
             </ThemedText>
             <View style={styles.workInputContainer}>
               <TextInput
                 style={styles.workInput}
                 value={plannedContribution}
-                onChangeText={(t) => formatWorkAmount(t, setPlannedContribution)}
+                onChangeText={(text) => formatWorkAmount(text, setPlannedContribution)}
                 placeholder="0"
-                placeholderTextColor={Colors.dark.textDisabled}
+                placeholderTextColor={Colors.light.textDisabled}
                 keyboardType="numeric"
               />
-              <ThemedText type="body" secondary>руб.</ThemedText>
+              <ThemedText type="body" secondary> руб.</ThemedText>
             </View>
+
+            {plannedEarning && (
+              <View style={styles.remainingFundsCard}>
+                <MaterialCommunityIcons
+                  name="wallet-outline"
+                  size={20}
+                  color={Colors.light.primary}
+                />
+                <View style={styles.remainingFundsContent}>
+                  <ThemedText type="small" secondary>
+                    Останется свободных средств
+                  </ThemedText>
+                  <ThemedText type="h4" style={styles.remainingFundsAmount}>
+                    {formatCurrency(getRemainingFunds())} руб.
+                  </ThemedText>
+                </View>
+              </View>
+            )}
 
             <View style={styles.modalActions}>
               <Pressable
@@ -661,7 +760,7 @@ export default function GoalsScreen() {
                 onPress={handleSaveWorkSession}
                 style={[styles.modalButton, styles.modalButtonConfirm]}
               >
-                <ThemedText type="body" style={styles.confirmText}>Сохранить</ThemedText>
+                <ThemedText type="body" style={styles.confirmText}>Добавить</ThemedText>
               </Pressable>
             </View>
           </Pressable>
@@ -671,90 +770,93 @@ export default function GoalsScreen() {
   );
 }
 
-function getGoalsWord(count: number): string {
-  const lastTwo = count % 100;
-  const lastOne = count % 10;
-  
-  if (lastTwo >= 11 && lastTwo <= 19) {
-    return "целей";
-  }
-  if (lastOne === 1) {
-    return "цель";
-  }
-  if (lastOne >= 2 && lastOne <= 4) {
-    return "цели";
-  }
-  return "целей";
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   emptyContainer: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: Spacing.xl,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: Spacing.md,
-    gap: Spacing.md,
   },
   greetingContainer: {
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
   greetingRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   piggyIcon: {
     width: 40,
     height: 40,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.dark.backgroundSecondary,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 91, 255, 0.1)",
     justifyContent: "center",
     alignItems: "center",
   },
   subtitle: {
-    marginTop: Spacing.xs,
     marginLeft: 52,
   },
-  workPromptCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.dark.backgroundDefault,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-    borderStyle: "dashed",
-    gap: Spacing.sm,
+  workSessionsContainer: {
+    marginBottom: Spacing.lg,
   },
-  workPromptContent: {
+  workSessionsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: Spacing.sm,
+  },
+  totalStats: {
+    flexDirection: "row",
+    gap: Spacing.md,
+    marginBottom: Spacing.sm,
+    padding: Spacing.sm,
+    backgroundColor: Colors.light.backgroundSecondary,
+    borderRadius: BorderRadius.md,
+  },
+  totalStat: {
     flex: 1,
   },
+  totalAmount: {
+    color: Colors.light.primary,
+    fontWeight: "600",
+  },
+  totalContribution: {
+    color: Colors.light.success,
+    fontWeight: "600",
+  },
   workCard: {
-    backgroundColor: Colors.dark.backgroundDefault,
+    backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.dark.primary,
+    marginBottom: Spacing.sm,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   workCardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
   },
   workIconContainer: {
     width: 40,
     height: 40,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.dark.backgroundSecondary,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 91, 255, 0.1)",
     justifyContent: "center",
     alignItems: "center",
+    marginRight: Spacing.sm,
   },
   workCardContent: {
     flex: 1,
@@ -762,82 +864,72 @@ const styles = StyleSheet.create({
   workTitle: {
     fontWeight: "600",
   },
-  workCardDetails: {
-    flexDirection: "row",
-    gap: Spacing.lg,
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
+  workAmounts: {
+    alignItems: "flex-end",
   },
-  workStat: {
-    flex: 1,
+  workEarning: {
+    color: Colors.light.primary,
+    fontWeight: "600",
   },
-  workAmount: {
-    color: Colors.dark.primary,
-    marginTop: 2,
+  workContrib: {
+    color: Colors.light.success,
   },
-  workContribution: {
-    color: Colors.dark.success,
-    marginTop: 2,
-  },
-  encouragementContainer: {
+  workPromptCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.xs,
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: Colors.dark.border,
+    backgroundColor: Colors.light.card,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  encouragementText: {
-    color: Colors.dark.warning,
+  workPromptContent: {
     flex: 1,
+    marginLeft: Spacing.md,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
-    padding: Spacing.lg,
+    padding: Spacing.md,
   },
   modalContent: {
-    backgroundColor: Colors.dark.backgroundDefault,
+    backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     width: "100%",
-    maxWidth: 340,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
+    maxWidth: 360,
   },
   overflowModalContent: {
-    backgroundColor: Colors.dark.backgroundDefault,
+    backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     width: "100%",
-    maxWidth: 340,
-    maxHeight: "70%",
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
+    maxWidth: 360,
+    maxHeight: "80%",
   },
   workModalContent: {
-    backgroundColor: Colors.dark.backgroundDefault,
+    backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.xl,
     padding: Spacing.lg,
     width: "100%",
-    maxWidth: 380,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
+    maxWidth: 400,
+    maxHeight: "90%",
   },
   modalHeader: {
-    marginBottom: Spacing.lg,
+    alignItems: "center",
+    marginBottom: Spacing.md,
   },
   remainingHint: {
     marginTop: Spacing.xs,
-    color: Colors.dark.warning,
   },
   overflowHint: {
-    marginTop: Spacing.sm,
+    marginTop: Spacing.xs,
   },
   quickAddInputContainer: {
     flexDirection: "row",
@@ -846,92 +938,11 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   quickAddInput: {
-    fontSize: 36,
+    fontSize: 40,
     fontWeight: "700",
-    color: Colors.dark.primary,
-    textAlign: "right",
+    color: Colors.light.text,
+    textAlign: "center",
     minWidth: 100,
-  },
-  overflowGoalsList: {
-    maxHeight: 200,
-    marginBottom: Spacing.md,
-  },
-  overflowGoalItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.dark.backgroundSecondary,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-  },
-  overflowGoalInfo: {
-    flex: 1,
-  },
-  skipButton: {
-    marginTop: Spacing.sm,
-  },
-  workDateOptions: {
-    flexDirection: "row",
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
-  },
-  workDateOption: {
-    flex: 1,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.dark.backgroundSecondary,
-    alignItems: "center",
-  },
-  workDateOptionSelected: {
-    backgroundColor: Colors.dark.primary,
-  },
-  workDateTextSelected: {
-    color: Colors.dark.buttonText,
-  },
-  workLabel: {
-    marginBottom: Spacing.xs,
-    marginLeft: Spacing.xs,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  workOperationOptions: {
-    flexDirection: "row",
-    gap: Spacing.sm,
-    marginBottom: Spacing.lg,
-  },
-  workOperationOption: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.xs,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.dark.backgroundSecondary,
-  },
-  workOperationOptionSelected: {
-    backgroundColor: Colors.dark.primary,
-  },
-  workOperationTextSelected: {
-    color: Colors.dark.buttonText,
-  },
-  workInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.dark.backgroundSecondary,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.dark.border,
-  },
-  workInput: {
-    flex: 1,
-    fontSize: 24,
-    fontWeight: "600",
-    color: Colors.dark.text,
-    paddingVertical: Spacing.md,
   },
   modalActions: {
     flexDirection: "row",
@@ -944,13 +955,118 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalButtonCancel: {
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.backgroundSecondary,
   },
   modalButtonConfirm: {
-    backgroundColor: Colors.dark.primary,
+    backgroundColor: Colors.light.primary,
   },
   confirmText: {
-    color: Colors.dark.buttonText,
+    color: Colors.light.buttonText,
     fontWeight: "600",
+  },
+  overflowGoalsList: {
+    maxHeight: 200,
+    marginBottom: Spacing.md,
+  },
+  overflowGoalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.light.backgroundSecondary,
+    marginBottom: Spacing.xs,
+  },
+  overflowGoalInfo: {
+    flex: 1,
+  },
+  safeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.light.safeLight,
+    marginBottom: Spacing.md,
+  },
+  safeButtonText: {
+    color: Colors.light.safe,
+    fontWeight: "600",
+  },
+  dateScroll: {
+    marginBottom: Spacing.md,
+  },
+  dateScrollContent: {
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+  },
+  dateOption: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.full,
+    backgroundColor: Colors.light.backgroundSecondary,
+  },
+  dateOptionSelected: {
+    backgroundColor: Colors.light.primary,
+  },
+  dateTextSelected: {
+    color: Colors.light.buttonText,
+    fontWeight: "600",
+  },
+  workLabel: {
+    marginBottom: Spacing.sm,
+  },
+  workOperationOptions: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  workOperationOption: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.light.backgroundSecondary,
+  },
+  workOperationOptionSelected: {
+    backgroundColor: Colors.light.primary,
+  },
+  workOperationTextSelected: {
+    color: Colors.light.buttonText,
+    fontWeight: "600",
+  },
+  workInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.light.backgroundSecondary,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  workInput: {
+    flex: 1,
+    fontSize: 24,
+    fontWeight: "600",
+    color: Colors.light.text,
+    paddingVertical: Spacing.md,
+  },
+  remainingFundsCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 91, 255, 0.05)",
+    borderRadius: BorderRadius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    gap: Spacing.sm,
+  },
+  remainingFundsContent: {
+    flex: 1,
+  },
+  remainingFundsAmount: {
+    color: Colors.light.primary,
   },
 });

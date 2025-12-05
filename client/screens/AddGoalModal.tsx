@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect } from "react";
-import { StyleSheet, View, TextInput, Alert } from "react-native";
+import { StyleSheet, View, TextInput, Alert, Pressable, ScrollView } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { HeaderButton } from "@react-navigation/elements";
@@ -9,7 +9,7 @@ import * as Haptics from "expo-haptics";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
-import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import { Colors, Spacing, BorderRadius, GOAL_ICONS } from "@/constants/theme";
 import { storage } from "@/lib/storage";
 import { Goal } from "@/lib/types";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
@@ -26,6 +26,7 @@ export default function AddGoalModal() {
 
   const [name, setName] = useState("");
   const [targetAmount, setTargetAmount] = useState("");
+  const [selectedIcon, setSelectedIcon] = useState("target");
   const [existingGoal, setExistingGoal] = useState<Goal | null>(null);
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function AddGoalModal() {
       setExistingGoal(goal);
       setName(goal.name);
       setTargetAmount(goal.targetAmount.toString());
+      setSelectedIcon(goal.icon || "target");
     }
   };
 
@@ -61,11 +63,13 @@ export default function AddGoalModal() {
         await storage.updateGoal(goalId!, {
           name: name.trim(),
           targetAmount: amount,
+          icon: selectedIcon,
         });
       } else {
         await storage.addGoal({
           name: name.trim(),
           targetAmount: amount,
+          icon: selectedIcon,
         });
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -91,7 +95,7 @@ export default function AddGoalModal() {
         </HeaderButton>
       ),
     });
-  }, [navigation, name, targetAmount, isEditing]);
+  }, [navigation, name, targetAmount, isEditing, selectedIcon]);
 
   const formatAmount = (text: string) => {
     const cleaned = text.replace(/[^\d]/g, "");
@@ -101,6 +105,11 @@ export default function AddGoalModal() {
     }
     const number = parseInt(cleaned, 10);
     setTargetAmount(number.toLocaleString("ru-RU"));
+  };
+
+  const handleIconSelect = (iconName: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedIcon(iconName);
   };
 
   return (
@@ -124,7 +133,7 @@ export default function AddGoalModal() {
             value={name}
             onChangeText={setName}
             placeholder="Например: Новый iPhone"
-            placeholderTextColor={Colors.dark.textDisabled}
+            placeholderTextColor={Colors.light.textDisabled}
             autoFocus
             returnKeyType="next"
             maxLength={50}
@@ -141,7 +150,7 @@ export default function AddGoalModal() {
               value={targetAmount}
               onChangeText={formatAmount}
               placeholder="0"
-              placeholderTextColor={Colors.dark.textDisabled}
+              placeholderTextColor={Colors.light.textDisabled}
               keyboardType="numeric"
               returnKeyType="done"
             />
@@ -151,11 +160,35 @@ export default function AddGoalModal() {
           </View>
         </View>
 
+        <View style={styles.inputGroup}>
+          <ThemedText type="small" secondary style={styles.label}>
+            ИКОНКА ЦЕЛИ
+          </ThemedText>
+          <View style={styles.iconsGrid}>
+            {GOAL_ICONS.map((icon) => (
+              <Pressable
+                key={icon.name}
+                style={[
+                  styles.iconButton,
+                  selectedIcon === icon.name && styles.iconButtonSelected,
+                ]}
+                onPress={() => handleIconSelect(icon.name)}
+              >
+                <MaterialCommunityIcons
+                  name={icon.name as any}
+                  size={28}
+                  color={selectedIcon === icon.name ? Colors.light.primary : Colors.light.textSecondary}
+                />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
         <View style={styles.tipContainer}>
           <MaterialCommunityIcons
             name="lightbulb-outline"
             size={20}
-            color={Colors.dark.warning}
+            color={Colors.light.warning}
           />
           <ThemedText type="small" secondary style={styles.tipText}>
             Ставьте реалистичные цели и регулярно вносите накопления для
@@ -186,37 +219,56 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   input: {
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     fontSize: 18,
-    color: Colors.dark.text,
+    color: Colors.light.text,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.light.border,
   },
   amountInputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.dark.backgroundSecondary,
+    backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.dark.border,
+    borderColor: Colors.light.border,
   },
   amountInput: {
     flex: 1,
     fontSize: 32,
     fontWeight: "700",
-    color: Colors.dark.text,
+    color: Colors.light.text,
     paddingVertical: Spacing.md,
   },
   currency: {
     marginLeft: Spacing.sm,
   },
+  iconsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: Spacing.sm,
+  },
+  iconButton: {
+    width: 56,
+    height: 56,
+    borderRadius: BorderRadius.md,
+    backgroundColor: Colors.light.card,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "transparent",
+  },
+  iconButtonSelected: {
+    borderColor: Colors.light.primary,
+    backgroundColor: "rgba(0, 91, 255, 0.1)",
+  },
   tipContainer: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: Colors.dark.backgroundDefault,
+    backgroundColor: Colors.light.backgroundSecondary,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     marginTop: Spacing.md,
@@ -226,7 +278,7 @@ const styles = StyleSheet.create({
     marginLeft: Spacing.sm,
   },
   saveText: {
-    color: Colors.dark.primary,
+    color: Colors.light.primary,
     fontWeight: "600",
   },
 });
