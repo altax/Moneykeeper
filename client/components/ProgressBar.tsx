@@ -13,41 +13,49 @@ interface ProgressBarProps {
   percentage: number;
   height?: number;
   color?: string;
-  dynamicColor?: boolean;
+  showBackground?: boolean;
 }
 
-export function ProgressBar({ percentage, height = 8, color, dynamicColor = true }: ProgressBarProps) {
+export function ProgressBar({ 
+  percentage, 
+  height = 4, 
+  color,
+  showBackground = true,
+}: ProgressBarProps) {
   const { theme } = useTheme();
   const progress = useSharedValue(0);
 
   useEffect(() => {
     progress.value = withTiming(Math.min(percentage, 100) / 100, {
-      duration: 600,
-      easing: Easing.out(Easing.cubic),
+      duration: 500,
+      easing: Easing.out(Easing.quad),
     });
   }, [percentage]);
 
-  const getColor = () => {
-    if (color) return color;
-    if (!dynamicColor) return theme.primary;
-    
-    if (percentage >= 100) return theme.success;
-    if (percentage >= 75) return theme.success;
-    if (percentage >= 50) return theme.primary;
-    if (percentage >= 25) return theme.warning;
-    return theme.primary;
-  };
+  const fillColor = color || (percentage >= 100 ? theme.success : theme.text);
 
   const animatedStyle = useAnimatedStyle(() => ({
     width: `${progress.value * 100}%`,
   }));
 
   return (
-    <View style={[styles.container, { height, backgroundColor: theme.backgroundSecondary }]}>
+    <View 
+      style={[
+        styles.container, 
+        { 
+          height, 
+          backgroundColor: showBackground ? theme.backgroundTertiary : "transparent",
+          borderRadius: height / 2,
+        },
+      ]}
+    >
       <Animated.View 
         style={[
           styles.fill, 
-          { borderRadius: height / 2, backgroundColor: getColor() },
+          { 
+            borderRadius: height / 2, 
+            backgroundColor: fillColor,
+          },
           animatedStyle,
         ]} 
       />
@@ -57,7 +65,6 @@ export function ProgressBar({ percentage, height = 8, color, dynamicColor = true
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: BorderRadius.full,
     overflow: "hidden",
     width: "100%",
   },

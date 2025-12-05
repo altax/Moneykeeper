@@ -3,82 +3,78 @@ import { StyleSheet, Pressable, ViewStyle, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
-  WithSpringConfig,
+  withTiming,
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
-import { Spacing, BorderRadius, Responsive, Shadows } from "@/constants/theme";
+import { Spacing, BorderRadius, Responsive } from "@/constants/theme";
 
 interface CardProps {
-  elevation?: "none" | "sm" | "md" | "lg";
+  variant?: "default" | "outlined" | "subtle";
   title?: string;
   description?: string;
   children?: React.ReactNode;
   onPress?: () => void;
   style?: ViewStyle;
-  pressable?: boolean;
+  noPadding?: boolean;
 }
-
-const springConfig: WithSpringConfig = {
-  damping: 15,
-  mass: 0.3,
-  stiffness: 150,
-  overshootClamping: true,
-  energyThreshold: 0.001,
-};
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function Card({
-  elevation = "sm",
+  variant = "default",
   title,
   description,
   children,
   onPress,
   style,
-  pressable = true,
+  noPadding = false,
 }: CardProps) {
   const { theme } = useTheme();
-  const scale = useSharedValue(1);
+  const opacity = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
   }));
 
   const handlePressIn = () => {
-    if (onPress && pressable) {
-      scale.value = withSpring(0.98, springConfig);
+    if (onPress) {
+      opacity.value = withTiming(0.7, { duration: 100 });
     }
   };
 
   const handlePressOut = () => {
-    if (onPress && pressable) {
-      scale.value = withSpring(1, springConfig);
+    if (onPress) {
+      opacity.value = withTiming(1, { duration: 200 });
     }
   };
 
-  const getShadow = () => {
-    switch (elevation) {
-      case "none":
-        return {};
-      case "md":
-        return Shadows.md;
-      case "lg":
-        return Shadows.lg;
+  const getVariantStyle = () => {
+    switch (variant) {
+      case "outlined":
+        return {
+          backgroundColor: "transparent",
+          borderWidth: 1,
+          borderColor: theme.border,
+        };
+      case "subtle":
+        return {
+          backgroundColor: theme.backgroundSecondary,
+          borderWidth: 0,
+        };
       default:
-        return Shadows.sm;
+        return {
+          backgroundColor: theme.card,
+          borderWidth: 0,
+        };
     }
   };
 
   const cardStyle = [
     styles.card,
-    {
-      backgroundColor: theme.card,
-      borderColor: theme.cardBorder,
-    },
-    getShadow(),
+    getVariantStyle(),
+    noPadding && { padding: 0 },
     style,
   ];
 
@@ -91,7 +87,7 @@ export function Card({
         style={[cardStyle, animatedStyle]}
       >
         {title ? (
-          <ThemedText type="h4" style={styles.cardTitle}>
+          <ThemedText type="caption" secondary style={styles.cardTitle}>
             {title}
           </ThemedText>
         ) : null}
@@ -108,7 +104,7 @@ export function Card({
   return (
     <View style={cardStyle}>
       {title ? (
-        <ThemedText type="h4" style={styles.cardTitle}>
+        <ThemedText type="caption" secondary style={styles.cardTitle}>
           {title}
         </ThemedText>
       ) : null}
@@ -125,11 +121,10 @@ export function Card({
 const styles = StyleSheet.create({
   card: {
     padding: Responsive.cardPadding,
-    borderRadius: BorderRadius.xl,
-    borderWidth: 1,
+    borderRadius: BorderRadius.md,
   },
   cardTitle: {
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   cardDescription: {
     marginBottom: Spacing.sm,

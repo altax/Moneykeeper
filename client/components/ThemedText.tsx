@@ -6,8 +6,9 @@ import { Typography } from "@/constants/theme";
 export type ThemedTextProps = TextProps & {
   lightColor?: string;
   darkColor?: string;
-  type?: "hero" | "h1" | "h2" | "h3" | "h4" | "body" | "bodyLarge" | "small" | "caption" | "link";
+  type?: "hero" | "h1" | "h2" | "h3" | "h4" | "body" | "bodyLarge" | "small" | "caption" | "link" | "amount" | "amountLarge";
   secondary?: boolean;
+  tertiary?: boolean;
   disabled?: boolean;
 };
 
@@ -17,6 +18,7 @@ export function ThemedText({
   darkColor,
   type = "body",
   secondary = false,
+  tertiary = false,
   disabled = false,
   ...rest
 }: ThemedTextProps) {
@@ -37,6 +39,10 @@ export function ThemedText({
 
     if (type === "link") {
       return theme.link;
+    }
+
+    if (tertiary) {
+      return theme.textTertiary;
     }
 
     if (secondary) {
@@ -68,6 +74,10 @@ export function ThemedText({
         return Typography.caption;
       case "link":
         return Typography.link;
+      case "amount":
+        return Typography.amount;
+      case "amountLarge":
+        return Typography.amountLarge;
       default:
         return Typography.body;
     }
