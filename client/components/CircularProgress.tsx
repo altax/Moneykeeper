@@ -16,12 +16,14 @@ interface CircularProgressProps {
   percentage: number;
   size?: number;
   strokeWidth?: number;
+  color?: string;
 }
 
 export function CircularProgress({
   percentage,
   size = 200,
   strokeWidth = 16,
+  color,
 }: CircularProgressProps) {
   const progress = useSharedValue(0);
   const radius = (size - strokeWidth) / 2;
@@ -39,6 +41,7 @@ export function CircularProgress({
   }));
 
   const displayPercentage = Math.min(Math.round(percentage), 100);
+  const strokeColor = color || Colors.dark.primary;
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
@@ -55,7 +58,7 @@ export function CircularProgress({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={Colors.dark.primary}
+          stroke={strokeColor}
           strokeWidth={strokeWidth}
           fill="none"
           strokeDasharray={circumference}
@@ -65,7 +68,7 @@ export function CircularProgress({
         />
       </Svg>
       <View style={styles.textContainer}>
-        <ThemedText type="hero" style={styles.percentage}>
+        <ThemedText type="hero" style={[styles.percentage, { color: strokeColor }]}>
           {displayPercentage}%
         </ThemedText>
       </View>

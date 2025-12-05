@@ -75,23 +75,32 @@ export function ContributionItem({
         />
       </View>
       <View style={styles.content}>
-        <ThemedText type="bodyLarge" style={styles.amount}>
-          +{formatCurrency(contribution.amount)}
-        </ThemedText>
-        {showGoalName && goal ? (
-          <ThemedText type="small" secondary numberOfLines={1}>
-            {goal.name}
+        <View style={styles.mainRow}>
+          <ThemedText type="bodyLarge" style={styles.amount}>
+            +{formatCurrency(contribution.amount)} руб.
           </ThemedText>
+          <ThemedText type="caption" secondary>
+            {formatTime(contribution.date)}
+          </ThemedText>
+        </View>
+        {showGoalName && goal ? (
+          <View style={styles.goalRow}>
+            <MaterialCommunityIcons
+              name="target"
+              size={14}
+              color={Colors.dark.primary}
+            />
+            <ThemedText type="small" style={styles.goalName} numberOfLines={1}>
+              {goal.name}
+            </ThemedText>
+          </View>
         ) : null}
         {contribution.note ? (
-          <ThemedText type="caption" secondary numberOfLines={1}>
+          <ThemedText type="caption" secondary numberOfLines={1} style={styles.note}>
             {contribution.note}
           </ThemedText>
         ) : null}
       </View>
-      <ThemedText type="caption" secondary>
-        {formatTime(contribution.date)}
-      </ThemedText>
     </AnimatedPressable>
   );
 }
@@ -99,7 +108,7 @@ export function ContributionItem({
 const styles = StyleSheet.create({
   item: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
     backgroundColor: Colors.dark.backgroundDefault,
@@ -107,12 +116,35 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     marginRight: Spacing.sm,
+    marginTop: 2,
   },
   content: {
     flex: 1,
   },
+  mainRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   amount: {
     color: Colors.dark.success,
     fontWeight: "600",
+  },
+  goalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 4,
+    backgroundColor: Colors.dark.backgroundSecondary,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+    alignSelf: "flex-start",
+  },
+  goalName: {
+    color: Colors.dark.primary,
+  },
+  note: {
+    marginTop: 4,
   },
 });

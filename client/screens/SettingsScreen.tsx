@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from "react";
 import { StyleSheet, ScrollView, View, Switch, Alert, TextInput, Pressable } from "react-native";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -12,6 +13,9 @@ import { Card } from "@/components/Card";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { storage } from "@/lib/storage";
 import { AppSettings } from "@/lib/types";
+import { RootStackParamList } from "@/navigation/RootStackNavigator";
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface SettingRowProps {
   icon: string;
@@ -57,19 +61,28 @@ function SettingRow({ icon, label, value, onPress, danger }: SettingRowProps) {
 }
 
 export default function SettingsScreen() {
+  const navigation = useNavigation<NavigationProp>();
   const headerHeight = useHeaderHeight();
   const tabBarHeight = useBottomTabBarHeight();
   const [settings, setSettings] = useState<AppSettings>({
     userName: "",
     notificationsEnabled: false,
+    averageDailyEarning: 0,
   });
   const [isEditing, setIsEditing] = useState(false);
   const [nameInput, setNameInput] = useState("");
+  const [isEditingEarning, setIsEditingEarning] = useState(false);
+  const [earningInput, setEarningInput] = useState("");
+  const [archivedCount, setArchivedCount] = useState(0);
 
   const loadSettings = useCallback(async () => {
     const data = await storage.getSettings();
     setSettings(data);
     setNameInput(data.userName);
+    setEarningInput(data.averageDailyEarning > 0 ? data.averageDailyEarning.toString() : "");
+    
+    const archived = await storage.getArchivedGoals();
+    setArchivedCount(archived.length);
   }, []);
 
   useFocusEffect(
@@ -93,6 +106,25 @@ export default function SettingsScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
+  const handleSaveEarning = async () => {
+    const amount = parseFloat(earningInput.replace(/[^\d.]/g, "")) || 0;
+    const newSettings = { ...settings, averageDailyEarning: amount };
+    setSettings(newSettings);
+    await storage.saveSettings(newSettings);
+    setIsEditingEarning(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const formatEarningInput = (text: string) => {
+    const cleaned = text.replace(/[^\d]/g, "");
+    if (!cleaned) {
+      setEarningInput("");
+      return;
+    }
+    const number = parseInt(cleaned, 10);
+    setEarningInput(number.toLocaleString("ru-RU"));
+  };
+
   const handleClearData = () => {
     Alert.alert(
       "Очистить все данные?",
@@ -104,14 +136,19 @@ export default function SettingsScreen() {
           style: "destructive",
           onPress: async () => {
             await storage.clearAllData();
-            setSettings({ userName: "", notificationsEnabled: false });
+            setSettings({ userName: "", notificationsEnabled: false, averageDailyEarning: 0 });
             setNameInput("");
+            setEarningInput("");
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             Alert.alert("Готово", "Все данные очищены");
           },
         },
       ]
     );
+  };
+
+  const handleViewArchive = () => {
+    navigation.navigate("ArchivedGoals");
   };
 
   const appVersion = Constants.expoConfig?.version || "1.0.0";
@@ -183,6 +220,68 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <ThemedText type="small" secondary style={styles.sectionTitle}>
+            РАСЧЁТ ДНЕЙ ДО ЦЕЛИ
+          </ThemedText>
+          <Card style={styles.card}>
+            <View style={styles.earningRow}>
+              <View style={styles.earningIcon}>
+                <MaterialCommunityIcons
+                  name="currency-rub"
+                  size={20}
+                  color={Colors.dark.success}
+                />
+              </View>
+              <View style={styles.earningContent}>
+                <ThemedText type="body">Средний заработок в день</ThemedText>
+                {isEditingEarning ? (
+                  <View style={styles.earningInputContainer}>
+                    <TextInput
+                      style={styles.earningInput}
+                      value={earningInput}
+                      onChangeText={formatEarningInput}
+                      placeholder="0"
+                      placeholderTextColor={Colors.dark.textDisabled}
+                      keyboardType="numeric"
+                      autoFocus
+                      onSubmitEditing={handleSaveEarning}
+                      returnKeyType="done"
+                    />
+                    <ThemedText type="body" secondary> руб.</ThemedText>
+                    <Pressable onPress={handleSaveEarning} style={styles.saveButton}>
+                      <MaterialCommunityIcons
+                        name="check"
+                        size={20}
+                        color={Colors.dark.success}
+                      />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={() => setIsEditingEarning(true)}
+                    style={styles.earningDisplay}
+                  >
+                    <ThemedText type="h4" style={styles.earningAmount}>
+                      {settings.averageDailyEarning > 0 
+                        ? `${settings.averageDailyEarning.toLocaleString("ru-RU")} руб.`
+                        : "Не указано"}
+                    </ThemedText>
+                    <MaterialCommunityIcons
+                      name="pencil"
+                      size={16}
+                      color={Colors.dark.textSecondary}
+                    />
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          </Card>
+          <ThemedText type="caption" secondary style={styles.hint}>
+            Используется для расчёта количества дней до достижения цели
+          </ThemedText>
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText type="small" secondary style={styles.sectionTitle}>
             УВЕДОМЛЕНИЯ
           </ThemedText>
           <Card style={styles.card}>
@@ -208,6 +307,27 @@ export default function SettingsScreen() {
           </Card>
           <ThemedText type="caption" secondary style={styles.hint}>
             Получайте напоминания о внесении накоплений
+          </ThemedText>
+        </View>
+
+        <View style={styles.section}>
+          <ThemedText type="small" secondary style={styles.sectionTitle}>
+            АРХИВ
+          </ThemedText>
+          <Card style={styles.card}>
+            <SettingRow
+              icon="archive-outline"
+              label="Архивированные цели"
+              value={
+                <ThemedText type="body" secondary style={styles.archiveCount}>
+                  {archivedCount}
+                </ThemedText>
+              }
+              onPress={handleViewArchive}
+            />
+          </Card>
+          <ThemedText type="caption" secondary style={styles.hint}>
+            Просмотр выполненных и архивированных целей
           </ThemedText>
         </View>
 
@@ -308,6 +428,47 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.sm,
   },
+  earningRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    padding: Spacing.md,
+  },
+  earningIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: BorderRadius.sm,
+    backgroundColor: Colors.dark.backgroundSecondary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: Spacing.sm,
+  },
+  earningContent: {
+    flex: 1,
+  },
+  earningInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: Spacing.xs,
+  },
+  earningInput: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: Colors.dark.success,
+    padding: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    backgroundColor: Colors.dark.backgroundSecondary,
+    borderRadius: BorderRadius.sm,
+    minWidth: 100,
+  },
+  earningDisplay: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  earningAmount: {
+    color: Colors.dark.success,
+  },
   settingRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -333,6 +494,9 @@ const styles = StyleSheet.create({
   },
   settingLabelDanger: {
     color: Colors.dark.error,
+  },
+  archiveCount: {
+    marginRight: Spacing.sm,
   },
   hint: {
     marginTop: Spacing.xs,

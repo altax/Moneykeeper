@@ -5,6 +5,8 @@ export interface Goal {
   currentAmount: number;
   createdAt: string;
   updatedAt: string;
+  isArchived?: boolean;
+  archivedAt?: string;
 }
 
 export interface Contribution {
@@ -19,4 +21,5 @@ export interface Contribution {
 export interface AppSettings {
   userName: string;
   notificationsEnabled: boolean;
+  averageDailyEarning: number;
 }

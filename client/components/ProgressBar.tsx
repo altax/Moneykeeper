@@ -11,9 +11,10 @@ import { Colors, BorderRadius } from "@/constants/theme";
 interface ProgressBarProps {
   percentage: number;
   height?: number;
+  color?: string;
 }
 
-export function ProgressBar({ percentage, height = 8 }: ProgressBarProps) {
+export function ProgressBar({ percentage, height = 8, color }: ProgressBarProps) {
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -29,7 +30,13 @@ export function ProgressBar({ percentage, height = 8 }: ProgressBarProps) {
 
   return (
     <View style={[styles.container, { height }]}>
-      <Animated.View style={[styles.fill, animatedStyle]} />
+      <Animated.View 
+        style={[
+          styles.fill, 
+          animatedStyle,
+          color ? { backgroundColor: color } : null,
+        ]} 
+      />
     </View>
   );
 }

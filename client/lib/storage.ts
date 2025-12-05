@@ -8,6 +8,7 @@ const SETTINGS_KEY = "@kopilka_settings";
 const defaultSettings: AppSettings = {
   userName: "",
   notificationsEnabled: false,
+  averageDailyEarning: 0,
 };
 
 export const storage = {
@@ -19,6 +20,16 @@ export const storage = {
       console.error("Error reading goals:", error);
       return [];
     }
+  },
+
+  async getActiveGoals(): Promise<Goal[]> {
+    const goals = await this.getGoals();
+    return goals.filter((g) => !g.isArchived);
+  },
+
+  async getArchivedGoals(): Promise<Goal[]> {
+    const goals = await this.getGoals();
+    return goals.filter((g) => g.isArchived);
   },
 
   async saveGoals(goals: Goal[]): Promise<void> {
@@ -37,6 +48,7 @@ export const storage = {
       currentAmount: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      isArchived: false,
     };
     goals.push(newGoal);
     await this.saveGoals(goals);
@@ -55,6 +67,20 @@ export const storage = {
     };
     await this.saveGoals(goals);
     return goals[index];
+  },
+
+  async archiveGoal(id: string): Promise<Goal | null> {
+    return this.updateGoal(id, {
+      isArchived: true,
+      archivedAt: new Date().toISOString(),
+    });
+  },
+
+  async unarchiveGoal(id: string): Promise<Goal | null> {
+    return this.updateGoal(id, {
+      isArchived: false,
+      archivedAt: undefined,
+    });
   },
 
   async deleteGoal(id: string): Promise<void> {
