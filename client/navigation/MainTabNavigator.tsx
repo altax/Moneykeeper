@@ -3,52 +3,53 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Platform, StyleSheet } from "react-native";
+import HomeStackNavigator from "@/navigation/HomeStackNavigator";
 import GoalsStackNavigator from "@/navigation/GoalsStackNavigator";
-import SafeStackNavigator from "@/navigation/SafeStackNavigator";
-import HistoryStackNavigator from "@/navigation/HistoryStackNavigator";
-import SettingsStackNavigator from "@/navigation/SettingsStackNavigator";
-import { Colors, Spacing, BorderRadius } from "@/constants/theme";
+import ProfileStackNavigator from "@/navigation/ProfileStackNavigator";
+import { useTheme } from "@/hooks/useTheme";
+import { BorderRadius } from "@/constants/theme";
 
 export type MainTabParamList = {
+  HomeTab: undefined;
   GoalsTab: undefined;
-  SafeTab: undefined;
-  HistoryTab: undefined;
-  SettingsTab: undefined;
+  ProfileTab: undefined;
 };
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export default function MainTabNavigator() {
+  const { theme, isDark } = useTheme();
+
   return (
     <Tab.Navigator
-      initialRouteName="GoalsTab"
+      initialRouteName="HomeTab"
       screenOptions={{
-        tabBarActiveTintColor: Colors.light.primary,
-        tabBarInactiveTintColor: Colors.light.textTertiary,
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: theme.tabIconDefault,
         tabBarStyle: {
           position: "absolute",
           backgroundColor: Platform.select({
-            ios: "rgba(18, 18, 26, 0.92)",
-            android: Colors.light.backgroundDefault,
-            web: Colors.light.backgroundDefault,
+            ios: isDark ? "rgba(17, 24, 39, 0.92)" : "rgba(255, 255, 255, 0.92)",
+            android: theme.backgroundDefault,
+            web: theme.backgroundDefault,
           }),
           borderTopWidth: 1,
-          borderTopColor: Colors.light.border,
+          borderTopColor: theme.border,
           elevation: 0,
-          height: Platform.select({ ios: 85, android: 65, web: 65 }),
-          paddingBottom: Platform.select({ ios: 28, android: 8, web: 8 }),
-          paddingTop: 8,
+          height: Platform.select({ ios: 88, android: 68, web: 68 }),
+          paddingBottom: Platform.select({ ios: 28, android: 10, web: 10 }),
+          paddingTop: 10,
         },
         tabBarBackground: () =>
           Platform.OS === "ios" ? (
             <BlurView
               intensity={80}
-              tint="dark"
+              tint={isDark ? "dark" : "light"}
               style={StyleSheet.absoluteFill}
             />
           ) : null,
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: "500",
           marginTop: 2,
         },
@@ -56,42 +57,32 @@ export default function MainTabNavigator() {
       }}
     >
       <Tab.Screen
+        name="HomeTab"
+        component={HomeStackNavigator}
+        options={{
+          title: "Главная",
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="home" size={26} color={color} />
+          ),
+        }}
+      />
+      <Tab.Screen
         name="GoalsTab"
         component={GoalsStackNavigator}
         options={{
           title: "Цели",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="target" size={24} color={color} />
+            <MaterialCommunityIcons name="target" size={26} color={color} />
           ),
         }}
       />
       <Tab.Screen
-        name="SafeTab"
-        component={SafeStackNavigator}
+        name="ProfileTab"
+        component={ProfileStackNavigator}
         options={{
-          title: "Сейф",
+          title: "Профиль",
           tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="safe" size={24} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="HistoryTab"
-        component={HistoryStackNavigator}
-        options={{
-          title: "История",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="history" size={24} color={color} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="SettingsTab"
-        component={SettingsStackNavigator}
-        options={{
-          title: "Настройки",
-          tabBarIcon: ({ color, size }) => (
-            <MaterialCommunityIcons name="cog-outline" size={24} color={color} />
+            <MaterialCommunityIcons name="account-circle" size={26} color={color} />
           ),
         }}
       />

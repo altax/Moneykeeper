@@ -27,10 +27,10 @@ import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { storage } from "@/lib/storage";
 import { Goal, Contribution, AppSettings } from "@/lib/types";
 import { RootStackParamList } from "@/navigation/RootStackNavigator";
-import { GoalsStackParamList } from "@/navigation/GoalsStackNavigator";
+import { useTheme } from "@/hooks/useTheme";
 
-type NavigationProp = NativeStackNavigationProp<RootStackParamList & GoalsStackParamList>;
-type RouteType = RouteProp<GoalsStackParamList, "GoalDetail">;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type RouteType = RouteProp<RootStackParamList, "GoalDetail">;
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("ru-RU", {

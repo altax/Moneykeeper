@@ -1,25 +1,25 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useScreenOptions } from "@/hooks/useScreenOptions";
-import GoalsScreen from "@/screens/GoalsScreen";
+import ProfileScreen from "@/screens/ProfileScreen";
 import { HeaderTitle } from "@/components/HeaderTitle";
 
-export type GoalsStackParamList = {
-  Goals: undefined;
+export type ProfileStackParamList = {
+  Profile: undefined;
 };
 
-const Stack = createNativeStackNavigator<GoalsStackParamList>();
+const Stack = createNativeStackNavigator<ProfileStackParamList>();
 
-export default function GoalsStackNavigator() {
+export default function ProfileStackNavigator() {
   const screenOptions = useScreenOptions();
 
   return (
     <Stack.Navigator screenOptions={screenOptions}>
       <Stack.Screen
-        name="Goals"
-        component={GoalsScreen}
+        name="Profile"
+        component={ProfileScreen}
         options={{
-          headerTitle: () => <HeaderTitle title="Цели" />,
+          headerTitle: () => <HeaderTitle title="Профиль" />,
         }}
       />
     </Stack.Navigator>

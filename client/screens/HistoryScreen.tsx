@@ -12,9 +12,10 @@ import { EmptyState } from "@/components/EmptyState";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { storage } from "@/lib/storage";
 import { Goal, Contribution } from "@/lib/types";
-import { GoalsStackParamList } from "@/navigation/GoalsStackNavigator";
+import { RootStackParamList } from "@/navigation/RootStackNavigator";
+import { useTheme } from "@/hooks/useTheme";
 
-type NavigationProp = NativeStackNavigationProp<GoalsStackParamList>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface GoalSection {
   goal: Goal;

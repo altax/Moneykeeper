@@ -6,7 +6,8 @@ import Animated, {
   withTiming,
   Easing,
 } from "react-native-reanimated";
-import { Colors, BorderRadius } from "@/constants/theme";
+import { useTheme } from "@/hooks/useTheme";
+import { BorderRadius } from "@/constants/theme";
 
 interface ProgressBarProps {
   percentage: number;
@@ -15,52 +16,38 @@ interface ProgressBarProps {
   dynamicColor?: boolean;
 }
 
-export function ProgressBar({ percentage, height = 6, color, dynamicColor = true }: ProgressBarProps) {
+export function ProgressBar({ percentage, height = 8, color, dynamicColor = true }: ProgressBarProps) {
+  const { theme } = useTheme();
   const progress = useSharedValue(0);
-  const colorProgress = useSharedValue(0);
 
   useEffect(() => {
     progress.value = withTiming(Math.min(percentage, 100) / 100, {
-      duration: 500,
-      easing: Easing.out(Easing.cubic),
-    });
-    colorProgress.value = withTiming(Math.min(percentage, 100), {
-      duration: 500,
+      duration: 600,
       easing: Easing.out(Easing.cubic),
     });
   }, [percentage]);
 
-  const animatedStyle = useAnimatedStyle(() => {
-    let backgroundColor = Colors.light.primary;
+  const getColor = () => {
+    if (color) return color;
+    if (!dynamicColor) return theme.primary;
     
-    if (color) {
-      backgroundColor = color;
-    } else if (dynamicColor) {
-      if (colorProgress.value >= 100) {
-        backgroundColor = Colors.light.success;
-      } else if (colorProgress.value >= 75) {
-        backgroundColor = Colors.light.successLight;
-      } else if (colorProgress.value >= 50) {
-        backgroundColor = Colors.light.primary;
-      } else if (colorProgress.value >= 25) {
-        backgroundColor = Colors.light.primaryLight;
-      } else {
-        backgroundColor = Colors.light.accent;
-      }
-    }
-    
-    return {
-      width: `${progress.value * 100}%`,
-      backgroundColor,
-    };
-  });
+    if (percentage >= 100) return theme.success;
+    if (percentage >= 75) return theme.success;
+    if (percentage >= 50) return theme.primary;
+    if (percentage >= 25) return theme.warning;
+    return theme.primary;
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    width: `${progress.value * 100}%`,
+  }));
 
   return (
-    <View style={[styles.container, { height }]}>
+    <View style={[styles.container, { height, backgroundColor: theme.backgroundSecondary }]}>
       <Animated.View 
         style={[
           styles.fill, 
-          { borderRadius: height / 2 },
+          { borderRadius: height / 2, backgroundColor: getColor() },
           animatedStyle,
         ]} 
       />
@@ -70,7 +57,6 @@ export function ProgressBar({ percentage, height = 6, color, dynamicColor = true
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.light.backgroundTertiary,
     borderRadius: BorderRadius.full,
     overflow: "hidden",
     width: "100%",

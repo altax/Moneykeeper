@@ -8,7 +8,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Circle } from "react-native-svg";
 import { ThemedText } from "@/components/ThemedText";
-import { Colors } from "@/constants/theme";
+import { useTheme } from "@/hooks/useTheme";
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -17,14 +17,17 @@ interface CircularProgressProps {
   size?: number;
   strokeWidth?: number;
   color?: string;
+  showPercentage?: boolean;
 }
 
 export function CircularProgress({
   percentage,
-  size = 200,
-  strokeWidth = 16,
+  size = 180,
+  strokeWidth = 14,
   color,
+  showPercentage = true,
 }: CircularProgressProps) {
+  const { theme } = useTheme();
   const progress = useSharedValue(0);
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -41,7 +44,7 @@ export function CircularProgress({
   }));
 
   const displayPercentage = Math.min(Math.round(percentage), 100);
-  const strokeColor = color || Colors.light.primary;
+  const strokeColor = color || (percentage >= 100 ? theme.success : theme.primary);
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
@@ -50,7 +53,7 @@ export function CircularProgress({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={Colors.light.backgroundSecondary}
+          stroke={theme.backgroundSecondary}
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -67,11 +70,13 @@ export function CircularProgress({
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </Svg>
-      <View style={styles.textContainer}>
-        <ThemedText type="hero" style={[styles.percentage, { color: strokeColor }]}>
-          {displayPercentage}%
-        </ThemedText>
-      </View>
+      {showPercentage && (
+        <View style={styles.textContainer}>
+          <ThemedText type="hero" style={[styles.percentage, { color: strokeColor }]}>
+            {displayPercentage}%
+          </ThemedText>
+        </View>
+      )}
     </View>
   );
 }

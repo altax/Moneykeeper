@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Pressable, ViewStyle } from "react-native";
+import { StyleSheet, Pressable, ViewStyle, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -8,15 +8,17 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/ThemedText";
-import { Colors, Spacing, BorderRadius, Responsive } from "@/constants/theme";
+import { useTheme } from "@/hooks/useTheme";
+import { Spacing, BorderRadius, Responsive, Shadows } from "@/constants/theme";
 
 interface CardProps {
-  elevation?: number;
+  elevation?: "none" | "sm" | "md" | "lg";
   title?: string;
   description?: string;
   children?: React.ReactNode;
   onPress?: () => void;
   style?: ViewStyle;
+  pressable?: boolean;
 }
 
 const springConfig: WithSpringConfig = {
@@ -30,13 +32,15 @@ const springConfig: WithSpringConfig = {
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function Card({
-  elevation = 1,
+  elevation = "sm",
   title,
   description,
   children,
   onPress,
   style,
+  pressable = true,
 }: CardProps) {
+  const { theme } = useTheme();
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -44,36 +48,77 @@ export function Card({
   }));
 
   const handlePressIn = () => {
-    scale.value = withSpring(0.98, springConfig);
+    if (onPress && pressable) {
+      scale.value = withSpring(0.98, springConfig);
+    }
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, springConfig);
+    if (onPress && pressable) {
+      scale.value = withSpring(1, springConfig);
+    }
   };
 
+  const getShadow = () => {
+    switch (elevation) {
+      case "none":
+        return {};
+      case "md":
+        return Shadows.md;
+      case "lg":
+        return Shadows.lg;
+      default:
+        return Shadows.sm;
+    }
+  };
+
+  const cardStyle = [
+    styles.card,
+    {
+      backgroundColor: theme.card,
+      borderColor: theme.cardBorder,
+    },
+    getShadow(),
+    style,
+  ];
+
+  if (onPress) {
+    return (
+      <AnimatedPressable
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        style={[cardStyle, animatedStyle]}
+      >
+        {title ? (
+          <ThemedText type="h4" style={styles.cardTitle}>
+            {title}
+          </ThemedText>
+        ) : null}
+        {description ? (
+          <ThemedText type="small" secondary style={styles.cardDescription}>
+            {description}
+          </ThemedText>
+        ) : null}
+        {children}
+      </AnimatedPressable>
+    );
+  }
+
   return (
-    <AnimatedPressable
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      style={[
-        styles.card,
-        animatedStyle,
-        style,
-      ]}
-    >
+    <View style={cardStyle}>
       {title ? (
         <ThemedText type="h4" style={styles.cardTitle}>
           {title}
         </ThemedText>
       ) : null}
       {description ? (
-        <ThemedText type="small" style={styles.cardDescription}>
+        <ThemedText type="small" secondary style={styles.cardDescription}>
           {description}
         </ThemedText>
       ) : null}
       {children}
-    </AnimatedPressable>
+    </View>
   );
 }
 
@@ -81,14 +126,12 @@ const styles = StyleSheet.create({
   card: {
     padding: Responsive.cardPadding,
     borderRadius: BorderRadius.xl,
-    backgroundColor: Colors.light.card,
     borderWidth: 1,
-    borderColor: Colors.light.cardBorder,
   },
   cardTitle: {
     marginBottom: Spacing.sm,
   },
   cardDescription: {
-    color: Colors.light.textSecondary,
+    marginBottom: Spacing.sm,
   },
 });
