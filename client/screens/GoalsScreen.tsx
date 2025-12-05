@@ -112,26 +112,10 @@ function getShiftTimeRemaining(sessionDate: string, shiftType: ShiftType): strin
   const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
   
   if (hours < 1) {
-    return `${minutes} мин осталось`;
+    return `${minutes} мин`;
   }
   
-  return `${hours} ч ${minutes} мин осталось`;
-}
-
-function isShiftExpired(sessionDate: string, shiftType: ShiftType): boolean {
-  const now = new Date();
-  const shiftDate = new Date(sessionDate);
-  
-  if (shiftType === "day") {
-    shiftDate.setHours(8, 0, 0, 0);
-  } else {
-    shiftDate.setHours(20, 0, 0, 0);
-  }
-  
-  const shiftEndDate = new Date(shiftDate);
-  shiftEndDate.setHours(shiftEndDate.getHours() + 12);
-  
-  return now >= shiftEndDate;
+  return `${hours}ч ${minutes}м`;
 }
 
 function getGoalsWord(count: number): string {
@@ -167,20 +151,17 @@ export default function GoalsScreen() {
   const [otherGoals, setOtherGoals] = useState<Goal[]>([]);
   
   const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
+  const [completedSessions, setCompletedSessions] = useState<WorkSession[]>([]);
   const [showWorkModal, setShowWorkModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [workOperation, setWorkOperation] = useState<WorkOperationType>("reception");
-  const [plannedEarning, setPlannedEarning] = useState("");
-  const [plannedContribution, setPlannedContribution] = useState("");
   const [shiftType, setShiftType] = useState<ShiftType>("day");
-  const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
   
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completingSession, setCompletingSession] = useState<WorkSession | null>(null);
   const [actualEarning, setActualEarning] = useState("");
   const [actualContribution, setActualContribution] = useState("");
   const [completeGoalId, setCompleteGoalId] = useState<string | null>(null);
-  const [sessionsToComplete, setSessionsToComplete] = useState<WorkSession[]>([]);
 
   const loadData = useCallback(async () => {
     await storage.autoCompleteExpiredSessions();
@@ -201,8 +182,8 @@ export default function GoalsScreen() {
     const activeSessions = await storage.getActiveWorkSessions();
     setWorkSessions(activeSessions);
     
-    const toComplete = await storage.getTodayOrPastUncompletedSessions();
-    setSessionsToComplete(toComplete);
+    const completed = await storage.getCompletedWorkSessions();
+    setCompletedSessions(completed.slice(0, 10));
   }, []);
 
   useFocusEffect(
@@ -334,16 +315,6 @@ export default function GoalsScreen() {
     await loadData();
   };
 
-  const formatWorkAmount = (text: string, setter: (value: string) => void) => {
-    const cleaned = text.replace(/[^\d]/g, "");
-    if (!cleaned) {
-      setter("");
-      return;
-    }
-    const number = parseInt(cleaned, 10);
-    setter(number.toLocaleString("ru-RU"));
-  };
-
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customDate, setCustomDate] = useState<Date>(new Date());
   const [pickerMonth, setPickerMonth] = useState(() => {
@@ -437,30 +408,11 @@ export default function GoalsScreen() {
       { date: today, label: "Сегодня" },
       { date: tomorrow, label: "Завтра" },
       { date: dayAfter, label: "Послезавтра" },
-      { date: new Date(), label: "Другая дата...", isCustom: true },
+      { date: new Date(), label: "Другая", isCustom: true },
     ];
   };
 
   const handleSaveWorkSession = async () => {
-    const earning = parseFloat(plannedEarning.replace(/[^\d.]/g, "")) || 0;
-    const contribution = parseFloat(plannedContribution.replace(/[^\d.]/g, "")) || 0;
-
-    if (earning <= 0) {
-      setShowWorkModal(false);
-      return;
-    }
-
-    if (contribution > earning) {
-      Alert.alert("Ошибка", "Сумма в цель не может превышать заработок");
-      return;
-    }
-
-    const activeGoals = goals.filter(g => g.currentAmount < g.targetAmount);
-    if (contribution > 0 && activeGoals.length > 1 && !selectedGoalId) {
-      Alert.alert("Выберите цель", "Укажите, в какую цель направить средства");
-      return;
-    }
-
     const sessionDate = selectedDate.toDateString();
     const existingSession = workSessions.find(s => 
       new Date(s.date).toDateString() === sessionDate && s.shiftType === shiftType
@@ -475,19 +427,16 @@ export default function GoalsScreen() {
       date: selectedDate.toISOString(),
       operationType: workOperation,
       shiftType: shiftType,
-      plannedEarning: earning,
-      plannedContribution: contribution,
-      goalId: selectedGoalId || undefined,
+      plannedEarning: 0,
+      plannedContribution: 0,
+      goalId: undefined,
       isCompleted: false,
     });
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setShowWorkModal(false);
-    setPlannedEarning("");
-    setPlannedContribution("");
     setSelectedDate(new Date());
     setShiftType("day");
-    setSelectedGoalId(null);
     await loadData();
   };
 
@@ -512,9 +461,9 @@ export default function GoalsScreen() {
 
   const handleOpenCompleteModal = (session: WorkSession) => {
     setCompletingSession(session);
-    setActualEarning(session.plannedEarning.toLocaleString("ru-RU"));
-    setActualContribution(session.plannedContribution.toLocaleString("ru-RU"));
-    setCompleteGoalId(session.goalId || null);
+    setActualEarning("");
+    setActualContribution("");
+    setCompleteGoalId(null);
     setShowCompleteModal(true);
   };
 
@@ -523,6 +472,11 @@ export default function GoalsScreen() {
 
     const earning = parseFloat(actualEarning.replace(/[^\d.]/g, "")) || 0;
     const contribution = parseFloat(actualContribution.replace(/[^\d.]/g, "")) || 0;
+
+    if (earning <= 0) {
+      Alert.alert("Ошибка", "Укажите сумму заработка");
+      return;
+    }
 
     if (contribution > earning) {
       Alert.alert("Ошибка", "Взнос не может превышать заработок");
@@ -592,36 +546,10 @@ export default function GoalsScreen() {
     return goal?.name || null;
   };
 
-  const getTotalFreeToSafe = (): number => {
-    return getTotalPlannedEarnings() - getTotalPlannedContributions();
-  };
-
   const handleCloseWorkModal = () => {
-    const hasData = plannedEarning.length > 0 || plannedContribution.length > 0;
-    
-    if (hasData) {
-      Alert.alert(
-        "Отменить?",
-        "Вы ввели данные. Уверены, что хотите отменить?",
-        [
-          { text: "Продолжить", style: "cancel" },
-          {
-            text: "Отменить",
-            style: "destructive",
-            onPress: () => {
-              setShowWorkModal(false);
-              setPlannedEarning("");
-              setPlannedContribution("");
-              setSelectedDate(new Date());
-              setShiftType("day");
-              setSelectedGoalId(null);
-            },
-          },
-        ]
-      );
-    } else {
-      setShowWorkModal(false);
-    }
+    setShowWorkModal(false);
+    setSelectedDate(new Date());
+    setShiftType("day");
   };
 
   const calculateDaysToGoal = (goal: Goal): number | null => {
@@ -637,18 +565,13 @@ export default function GoalsScreen() {
     ? `${settings.userName}` 
     : "Мои цели";
 
-  const getTotalPlannedEarnings = (): number => {
-    return workSessions.reduce((sum, s) => sum + s.plannedEarning, 0);
+  const getTotalCompletedEarnings = (): number => {
+    return completedSessions.reduce((sum, s) => sum + (s.actualEarning || 0), 0);
   };
 
-  const getTotalPlannedContributions = (): number => {
-    return workSessions.reduce((sum, s) => sum + s.plannedContribution, 0);
-  };
-
-  const getRemainingFunds = (): number => {
-    const earning = parseFloat(plannedEarning.replace(/[^\d.]/g, "")) || 0;
-    const contribution = parseFloat(plannedContribution.replace(/[^\d.]/g, "")) || 0;
-    return Math.max(0, earning - contribution);
+  const getMaxCompletedEarning = (): number => {
+    if (completedSessions.length === 0) return 1;
+    return Math.max(...completedSessions.map(s => s.actualEarning || 0), 1);
   };
 
   return (
@@ -672,7 +595,7 @@ export default function GoalsScreen() {
           contentContainerStyle={[
             styles.scrollContent,
             {
-              paddingTop: headerHeight + Spacing.md,
+              paddingTop: headerHeight + Spacing.sm,
               paddingBottom: tabBarHeight + Spacing.xl,
             },
           ]}
@@ -692,64 +615,13 @@ export default function GoalsScreen() {
                 style={styles.addButton}
                 onPress={handleAddGoal}
               >
-                <ThemedText type="small" style={styles.addButtonText}>Новая цель</ThemedText>
+                <ThemedText type="small" style={styles.addButtonText}>+ Цель</ThemedText>
               </Pressable>
             </View>
             <ThemedText type="small" style={styles.subtitle}>
               {goals.length} {getGoalsWord(goals.length)} активно
             </ThemedText>
           </View>
-
-          {(() => {
-            const expiredSessions = sessionsToComplete.filter(s => isShiftExpired(s.date, s.shiftType));
-            const urgentSession = expiredSessions.length > 0 ? expiredSessions[0] : sessionsToComplete[0];
-            const isExpired = urgentSession && isShiftExpired(urgentSession.date, urgentSession.shiftType);
-            
-            if (!urgentSession) return null;
-            
-            return (
-              <Pressable 
-                style={[
-                  styles.completeShiftBanner,
-                  isExpired && styles.expiredShiftBanner
-                ]}
-                onPress={() => handleOpenCompleteModal(urgentSession)}
-              >
-                <View style={[
-                  styles.completeShiftBannerIcon,
-                  isExpired && styles.expiredShiftBannerIcon
-                ]}>
-                  <MaterialCommunityIcons
-                    name={isExpired ? "alert-circle-outline" : "clock-check-outline"}
-                    size={20}
-                    color={Colors.light.buttonText}
-                  />
-                </View>
-                <View style={styles.completeShiftBannerContent}>
-                  <ThemedText type="body" style={styles.completeShiftBannerTitle}>
-                    {isExpired ? "Смена завершена!" : "Завершите смену"}
-                  </ThemedText>
-                  <ThemedText type="caption" style={[
-                    styles.completeShiftBannerSubtitle,
-                    isExpired && styles.expiredShiftBannerSubtitle
-                  ]}>
-                    {isExpired 
-                      ? `${expiredSessions.length > 1 ? `${expiredSessions.length} смен ждут` : "12ч прошло"} • Подтвердите результат`
-                      : `${new Date(urgentSession.date).toLocaleDateString("ru-RU", {
-                          day: "numeric",
-                          month: "long"
-                        })} • ${urgentSession.shiftType === "day" ? "Дневная" : "Ночная"}`
-                    }
-                  </ThemedText>
-                </View>
-                <MaterialCommunityIcons
-                  name="chevron-right"
-                  size={20}
-                  color={Colors.light.buttonText}
-                />
-              </Pressable>
-            );
-          })()}
 
           {(() => {
             const activeSessions = workSessions.filter(s => isShiftActive(s.date, s.shiftType));
@@ -759,284 +631,198 @@ export default function GoalsScreen() {
               <>
                 {activeSessions.length > 0 && (
                   <View style={styles.activeShiftsCard}>
-                    <View style={styles.shiftsHeader}>
-                      <View style={styles.shiftsHeaderLeft}>
-                        <View style={styles.activeShiftsIcon}>
-                          <MaterialCommunityIcons
-                            name="briefcase-clock"
-                            size={18}
-                            color={Colors.light.warning}
-                          />
-                        </View>
-                        <ThemedText type="h4" style={styles.shiftsTitle}>Активные смены</ThemedText>
-                      </View>
+                    <View style={styles.compactShiftsHeader}>
+                      <View style={styles.activeIndicatorDot} />
+                      <ThemedText type="body" style={styles.compactShiftsTitle}>Активная смена</ThemedText>
                     </View>
                     
-                    <View style={styles.shiftsList}>
-                      {activeSessions.map((session, index) => {
-                        const goalName = getGoalName(session.goalId);
-                        const freeAmount = session.plannedEarning - session.plannedContribution;
-                        const progress = getShiftProgress(session.date, session.shiftType);
-                        const timeRemaining = getShiftTimeRemaining(session.date, session.shiftType);
+                    {activeSessions.map((session) => {
+                      const progress = getShiftProgress(session.date, session.shiftType);
+                      const timeRemaining = getShiftTimeRemaining(session.date, session.shiftType);
+                      
+                      return (
+                        <View key={session.id} style={styles.activeShiftItem}>
+                          <View style={styles.activeShiftRow}>
+                            <View style={styles.activeShiftInfo}>
+                              <MaterialCommunityIcons
+                                name={session.shiftType === "day" ? "weather-sunny" : "weather-night"}
+                                size={16}
+                                color={Colors.light.warning}
+                              />
+                              <ThemedText type="body" style={styles.activeShiftType}>
+                                {session.shiftType === "day" ? "День" : "Ночь"}
+                              </ThemedText>
+                              <View style={styles.operationBadge}>
+                                <ThemedText type="caption" style={styles.operationText}>
+                                  {session.operationType === "reception" ? "Приёмка" : "Возвраты"}
+                                </ThemedText>
+                              </View>
+                            </View>
+                            <Pressable 
+                              style={styles.cancelButton}
+                              onPress={() => handleCancelWorkSession(session)}
+                            >
+                              <MaterialCommunityIcons
+                                name="close"
+                                size={14}
+                                color={Colors.light.textTertiary}
+                              />
+                            </Pressable>
+                          </View>
+                          
+                          <View style={styles.progressContainer}>
+                            <View style={styles.progressBar}>
+                              <View style={[styles.progressFill, { width: `${progress}%` }]} />
+                            </View>
+                            <View style={styles.progressRow}>
+                              <ThemedText type="caption" style={styles.progressText}>
+                                {timeRemaining}
+                              </ThemedText>
+                              <Pressable 
+                                style={styles.completeShiftBtn}
+                                onPress={() => handleOpenCompleteModal(session)}
+                              >
+                                <MaterialCommunityIcons
+                                  name="check"
+                                  size={12}
+                                  color={Colors.light.success}
+                                />
+                                <ThemedText type="caption" style={styles.completeShiftText}>
+                                  Завершить
+                                </ThemedText>
+                              </Pressable>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+                {plannedSessions.length > 0 && (
+                  <View style={styles.plannedShiftsCard}>
+                    <View style={styles.compactShiftsHeader}>
+                      <MaterialCommunityIcons
+                        name="calendar-clock"
+                        size={16}
+                        color={Colors.light.primary}
+                      />
+                      <ThemedText type="body" style={styles.compactShiftsTitle}>Запланировано</ThemedText>
+                      <Pressable 
+                        style={styles.addShiftBtn}
+                        onPress={() => setShowWorkModal(true)}
+                      >
+                        <MaterialCommunityIcons
+                          name="plus"
+                          size={16}
+                          color={Colors.light.primary}
+                        />
+                      </Pressable>
+                    </View>
+                    
+                    <View style={styles.plannedShiftsList}>
+                      {plannedSessions.map((session, index) => {
+                        const timeUntil = getTimeUntilShift(session.date, session.shiftType);
                         
                         return (
                           <View
                             key={session.id}
                             style={[
-                              styles.shiftItemNew,
-                              index < activeSessions.length - 1 && styles.shiftItemBorder
+                              styles.plannedShiftItem,
+                              index < plannedSessions.length - 1 && styles.plannedShiftItemBorder
                             ]}
                           >
-                            <View style={styles.shiftItemHeader}>
-                              <View style={styles.shiftDateNew}>
-                                <View style={styles.activeIndicator} />
-                                <ThemedText type="body" style={styles.shiftDateTextActive}>
-                                  {session.shiftType === "day" ? "Дневная смена" : "Ночная смена"}
+                            <View style={styles.plannedShiftLeft}>
+                              <MaterialCommunityIcons
+                                name={session.shiftType === "day" ? "weather-sunny" : "weather-night"}
+                                size={14}
+                                color={session.shiftType === "day" ? Colors.light.warning : Colors.light.accent}
+                              />
+                              <ThemedText type="small" style={styles.plannedShiftDate}>
+                                {new Date(session.date).toLocaleDateString("ru-RU", { 
+                                  day: "numeric", 
+                                  month: "short"
+                                })}
+                              </ThemedText>
+                              <View style={styles.opBadgeSmall}>
+                                <ThemedText type="caption" style={styles.opTextSmall}>
+                                  {session.operationType === "reception" ? "П" : "В"}
                                 </ThemedText>
                               </View>
+                            </View>
+                            <View style={styles.plannedShiftRight}>
+                              <ThemedText type="caption" style={styles.timeUntilText}>
+                                {timeUntil}
+                              </ThemedText>
                               <Pressable 
-                                style={styles.shiftDeleteButton}
+                                style={styles.cancelBtnSmall}
                                 onPress={() => handleCancelWorkSession(session)}
                               >
                                 <MaterialCommunityIcons
                                   name="close"
-                                  size={16}
+                                  size={12}
                                   color={Colors.light.textTertiary}
                                 />
                               </Pressable>
                             </View>
-                            
-                            <View style={styles.progressContainer}>
-                              <View style={styles.progressBar}>
-                                <View style={[styles.progressFill, { width: `${progress}%` }]} />
-                              </View>
-                              <ThemedText type="caption" style={styles.progressText}>
-                                {timeRemaining}
-                              </ThemedText>
-                            </View>
-
-                            <View style={styles.shiftDetailsGrid}>
-                              <View style={styles.shiftDetailItem}>
-                                <ThemedText type="caption" style={styles.shiftDetailLabel}>Заработок</ThemedText>
-                                <ThemedText type="body" style={styles.shiftDetailValue}>
-                                  {formatCurrency(session.plannedEarning)} ₽
-                                </ThemedText>
-                              </View>
-                              {session.plannedContribution > 0 && (
-                                <View style={styles.shiftDetailItem}>
-                                  <ThemedText type="caption" style={styles.shiftDetailLabel}>
-                                    {goalName ? `→ ${goalName}` : "В цель"}
-                                  </ThemedText>
-                                  <ThemedText type="body" style={styles.shiftDetailValueAccent}>
-                                    {formatCurrency(session.plannedContribution)} ₽
-                                  </ThemedText>
-                                </View>
-                              )}
-                              {freeAmount > 0 && (
-                                <View style={styles.shiftDetailItem}>
-                                  <ThemedText type="caption" style={styles.shiftDetailLabel}>→ Сейф</ThemedText>
-                                  <ThemedText type="body" style={styles.shiftDetailValueSuccess}>
-                                    {formatCurrency(freeAmount)} ₽
-                                  </ThemedText>
-                                </View>
-                              )}
-                            </View>
-
-                            <Pressable 
-                              style={styles.completeActiveShiftButton}
-                              onPress={() => handleOpenCompleteModal(session)}
-                            >
-                              <MaterialCommunityIcons
-                                name="check-circle"
-                                size={16}
-                                color={Colors.light.buttonText}
-                              />
-                              <ThemedText type="small" style={styles.completeActiveShiftButtonText}>
-                                Завершить сейчас
-                              </ThemedText>
-                            </Pressable>
                           </View>
                         );
                       })}
                     </View>
                   </View>
                 )}
-              </>
-            );
-          })()}
-          
-          {workSessions.length > 0 ? (
-            <View style={styles.shiftsCard}>
-              <View style={styles.shiftsHeader}>
-                <View style={styles.shiftsHeaderLeft}>
-                  <View style={styles.shiftsIcon}>
+
+                {workSessions.length === 0 && (
+                  <Pressable style={styles.addShiftCard} onPress={() => setShowWorkModal(true)}>
                     <MaterialCommunityIcons
-                      name="calendar-clock"
+                      name="calendar-plus"
                       size={18}
                       color={Colors.light.primary}
                     />
-                  </View>
-                  <ThemedText type="h4" style={styles.shiftsTitle}>Запланировано</ThemedText>
-                </View>
-                <Pressable 
-                  style={styles.addShiftButton}
-                  onPress={() => setShowWorkModal(true)}
-                >
-                  <MaterialCommunityIcons
-                    name="plus"
-                    size={18}
-                    color={Colors.light.primary}
-                  />
-                </Pressable>
-              </View>
-              
-              <View style={styles.shiftsSummaryThree}>
-                <View style={styles.shiftsSummaryItemThree}>
-                  <ThemedText type="caption" style={styles.shiftsSummaryLabel}>Заработок</ThemedText>
-                  <ThemedText type="body" style={styles.shiftsSummaryValue}>
-                    {formatCurrency(getTotalPlannedEarnings())} ₽
-                  </ThemedText>
-                </View>
-                <View style={styles.shiftsSummaryDividerVertical} />
-                <View style={styles.shiftsSummaryItemThree}>
-                  <ThemedText type="caption" style={styles.shiftsSummaryLabel}>В цели</ThemedText>
-                  <ThemedText type="body" style={styles.shiftsSummaryValueAccent}>
-                    {formatCurrency(getTotalPlannedContributions())} ₽
-                  </ThemedText>
-                </View>
-                <View style={styles.shiftsSummaryDividerVertical} />
-                <View style={styles.shiftsSummaryItemThree}>
-                  <ThemedText type="caption" style={styles.shiftsSummaryLabel}>В сейф</ThemedText>
-                  <ThemedText type="body" style={styles.shiftsSummaryValueSuccess}>
-                    {formatCurrency(getTotalFreeToSafe())} ₽
-                  </ThemedText>
-                </View>
-              </View>
+                    <ThemedText type="small" style={styles.addShiftText}>Добавить смену</ThemedText>
+                  </Pressable>
+                )}
+              </>
+            );
+          })()}
 
-              <View style={styles.shiftsList}>
-                {workSessions.filter(s => !isShiftActive(s.date, s.shiftType)).map((session, index, filteredArr) => {
-                  const goalName = getGoalName(session.goalId);
-                  const freeAmount = session.plannedEarning - session.plannedContribution;
-                  const canComplete = sessionsToComplete.some(s => s.id === session.id);
-                  const timeUntil = getTimeUntilShift(session.date, session.shiftType);
+          {completedSessions.length > 0 && (
+            <View style={styles.completedSection}>
+              <View style={styles.completedHeader}>
+                <MaterialCommunityIcons
+                  name="check-circle"
+                  size={16}
+                  color={Colors.light.success}
+                />
+                <ThemedText type="body" style={styles.completedTitle}>Завершено</ThemedText>
+              </View>
+              <ThemedText type="h3" style={styles.completedTotal}>
+                {formatCurrency(getTotalCompletedEarnings())} ₽
+              </ThemedText>
+              
+              <View style={styles.barsContainer}>
+                {completedSessions.slice(0, 7).reverse().map((session, index) => {
+                  const maxEarning = getMaxCompletedEarning();
+                  const barHeight = ((session.actualEarning || 0) / maxEarning) * 60;
                   
                   return (
-                    <View
-                      key={session.id}
-                      style={[
-                        styles.shiftItemNew,
-                        index < filteredArr.length - 1 && styles.shiftItemBorder
-                      ]}
-                    >
-                      <View style={styles.shiftItemHeader}>
-                        <View style={styles.shiftDateNew}>
-                          <ThemedText type="body" style={styles.shiftDateTextNew}>
-                            {new Date(session.date).toLocaleDateString("ru-RU", { 
-                              day: "numeric", 
-                              month: "short"
-                            })}
-                          </ThemedText>
-                          <View style={styles.shiftTypeBadge}>
-                            <MaterialCommunityIcons
-                              name={session.shiftType === "day" ? "weather-sunny" : "weather-night"}
-                              size={12}
-                              color={Colors.light.textSecondary}
-                            />
-                            <ThemedText type="caption" style={styles.shiftTypeText}>
-                              {session.shiftType === "day" ? "День" : "Ночь"}
-                            </ThemedText>
-                          </View>
-                          <View style={styles.timeUntilBadge}>
-                            <MaterialCommunityIcons
-                              name="clock-outline"
-                              size={11}
-                              color={Colors.light.primary}
-                            />
-                            <ThemedText type="caption" style={styles.timeUntilText}>
-                              {timeUntil}
-                            </ThemedText>
-                          </View>
-                        </View>
-                        <Pressable 
-                          style={styles.shiftDeleteButton}
-                          onPress={() => handleCancelWorkSession(session)}
-                        >
-                          <MaterialCommunityIcons
-                            name="close"
-                            size={16}
-                            color={Colors.light.textTertiary}
-                          />
-                        </Pressable>
+                    <View key={session.id} style={styles.barWrapper}>
+                      <View style={styles.barColumn}>
+                        <View 
+                          style={[
+                            styles.bar, 
+                            { height: Math.max(4, barHeight) }
+                          ]} 
+                        />
                       </View>
-
-                      <View style={styles.shiftDetailsGrid}>
-                        <View style={styles.shiftDetailItem}>
-                          <ThemedText type="caption" style={styles.shiftDetailLabel}>Заработок</ThemedText>
-                          <ThemedText type="body" style={styles.shiftDetailValue}>
-                            {formatCurrency(session.plannedEarning)} ₽
-                          </ThemedText>
-                        </View>
-                        {session.plannedContribution > 0 && (
-                          <View style={styles.shiftDetailItem}>
-                            <ThemedText type="caption" style={styles.shiftDetailLabel}>
-                              {goalName ? `→ ${goalName}` : "В цель"}
-                            </ThemedText>
-                            <ThemedText type="body" style={styles.shiftDetailValueAccent}>
-                              {formatCurrency(session.plannedContribution)} ₽
-                            </ThemedText>
-                          </View>
-                        )}
-                        {freeAmount > 0 && (
-                          <View style={styles.shiftDetailItem}>
-                            <ThemedText type="caption" style={styles.shiftDetailLabel}>→ Сейф</ThemedText>
-                            <ThemedText type="body" style={styles.shiftDetailValueSuccess}>
-                              {formatCurrency(freeAmount)} ₽
-                            </ThemedText>
-                          </View>
-                        )}
-                      </View>
-
-                      {canComplete && (
-                        <Pressable 
-                          style={styles.completeShiftButton}
-                          onPress={() => handleOpenCompleteModal(session)}
-                        >
-                          <MaterialCommunityIcons
-                            name="check-circle-outline"
-                            size={16}
-                            color={Colors.light.primary}
-                          />
-                          <ThemedText type="small" style={styles.completeShiftButtonText}>
-                            Завершить смену
-                          </ThemedText>
-                        </Pressable>
-                      )}
+                      <ThemedText type="caption" style={styles.barLabel}>
+                        {new Date(session.date).toLocaleDateString("ru-RU", { day: "numeric" })}
+                      </ThemedText>
                     </View>
                   );
                 })}
               </View>
             </View>
-          ) : (
-            <Pressable style={styles.addShiftCard} onPress={() => setShowWorkModal(true)}>
-              <View style={styles.addShiftIcon}>
-                <MaterialCommunityIcons
-                  name="calendar-plus"
-                  size={20}
-                  color={Colors.light.primary}
-                />
-              </View>
-              <View style={styles.addShiftContent}>
-                <ThemedText type="body" style={styles.addShiftTitle}>Добавить смену</ThemedText>
-                <ThemedText type="caption" style={styles.addShiftSubtitle}>
-                  Планируйте заработок
-                </ThemedText>
-              </View>
-              <MaterialCommunityIcons
-                name="chevron-right"
-                size={20}
-                color={Colors.light.textTertiary}
-              />
-            </Pressable>
           )}
 
           <View style={styles.goalsSection}>
@@ -1185,249 +971,153 @@ export default function GoalsScreen() {
           onPress={handleCloseWorkModal}
         >
           <Pressable style={styles.workModalContent} onPress={() => {}}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.modalHeader}>
-                <ThemedText type="h4">Новая смена</ThemedText>
-              </View>
+            <View style={styles.modalHeader}>
+              <ThemedText type="h4">Новая смена</ThemedText>
+            </View>
 
-              <ThemedText type="caption" style={styles.workLabel}>Дата</ThemedText>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.dateScroll}
-                contentContainerStyle={styles.dateScrollContent}
-              >
-                {getDateOptions().map((option, index) => {
-                  const isSelected = !option.isCustom && 
-                    option.date.toDateString() === selectedDate.toDateString();
-                  
-                  if (option.isCustom) {
-                    return (
-                      <Pressable
-                        key="custom"
-                        style={[styles.dateOption, styles.dateOptionCustom]}
-                        onPress={handleOpenDatePicker}
-                      >
-                        <ThemedText type="small" style={styles.dateTextCustom}>
-                          {option.label}
-                        </ThemedText>
-                      </Pressable>
-                    );
-                  }
-                  
+            <ThemedText type="caption" style={styles.workLabel}>Дата</ThemedText>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.dateScroll}
+              contentContainerStyle={styles.dateScrollContent}
+            >
+              {getDateOptions().map((option, index) => {
+                const isSelected = !option.isCustom && 
+                  option.date.toDateString() === selectedDate.toDateString();
+                
+                if (option.isCustom) {
                   return (
                     <Pressable
-                      key={index}
-                      style={[
-                        styles.dateOption,
-                        isSelected && styles.dateOptionSelected,
-                      ]}
-                      onPress={() => setSelectedDate(option.date)}
+                      key="custom"
+                      style={[styles.dateOption, styles.dateOptionCustom]}
+                      onPress={handleOpenDatePicker}
                     >
-                      <ThemedText 
-                        type="small"
-                        style={isSelected ? styles.dateTextSelected : undefined}
-                      >
+                      <ThemedText type="small" style={styles.dateTextCustom}>
                         {option.label}
                       </ThemedText>
                     </Pressable>
                   );
-                })}
-              </ScrollView>
-
-              <ThemedText type="caption" style={styles.workLabel}>Тип смены</ThemedText>
-              <View style={styles.workOperationOptions}>
-                <Pressable
-                  style={[
-                    styles.workOperationOption,
-                    shiftType === "day" && styles.workOperationOptionSelected,
-                  ]}
-                  onPress={() => setShiftType("day")}
-                >
-                  <MaterialCommunityIcons
-                    name="weather-sunny"
-                    size={18}
-                    color={shiftType === "day" ? Colors.light.buttonText : Colors.light.textSecondary}
-                  />
-                  <ThemedText 
-                    type="small"
-                    style={shiftType === "day" ? styles.workOperationTextSelected : undefined}
+                }
+                
+                return (
+                  <Pressable
+                    key={index}
+                    style={[
+                      styles.dateOption,
+                      isSelected && styles.dateOptionSelected,
+                    ]}
+                    onPress={() => setSelectedDate(option.date)}
                   >
-                    Дневная
-                  </ThemedText>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.workOperationOption,
-                    shiftType === "night" && styles.workOperationOptionSelected,
-                  ]}
-                  onPress={() => setShiftType("night")}
-                >
-                  <MaterialCommunityIcons
-                    name="weather-night"
-                    size={18}
-                    color={shiftType === "night" ? Colors.light.buttonText : Colors.light.textSecondary}
-                  />
-                  <ThemedText 
-                    type="small"
-                    style={shiftType === "night" ? styles.workOperationTextSelected : undefined}
-                  >
-                    Ночная
-                  </ThemedText>
-                </Pressable>
-              </View>
-
-              <ThemedText type="caption" style={styles.workLabel}>Операция</ThemedText>
-              <View style={styles.workOperationOptions}>
-                <Pressable
-                  style={[
-                    styles.workOperationOption,
-                    workOperation === "reception" && styles.workOperationOptionSelected,
-                  ]}
-                  onPress={() => setWorkOperation("reception")}
-                >
-                  <MaterialCommunityIcons
-                    name="package-variant"
-                    size={18}
-                    color={workOperation === "reception" ? Colors.light.buttonText : Colors.light.textSecondary}
-                  />
-                  <ThemedText 
-                    type="small"
-                    style={workOperation === "reception" ? styles.workOperationTextSelected : undefined}
-                  >
-                    Приёмка
-                  </ThemedText>
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.workOperationOption,
-                    workOperation === "returns" && styles.workOperationOptionSelected,
-                  ]}
-                  onPress={() => setWorkOperation("returns")}
-                >
-                  <MaterialCommunityIcons
-                    name="package-variant-closed-remove"
-                    size={18}
-                    color={workOperation === "returns" ? Colors.light.buttonText : Colors.light.textSecondary}
-                  />
-                  <ThemedText 
-                    type="small"
-                    style={workOperation === "returns" ? styles.workOperationTextSelected : undefined}
-                  >
-                    Возвраты
-                  </ThemedText>
-                </Pressable>
-              </View>
-
-              <ThemedText type="caption" style={styles.workLabel}>Планируемый заработок</ThemedText>
-              <View style={styles.workInputContainer}>
-                <TextInput
-                  style={styles.workInput}
-                  value={plannedEarning}
-                  onChangeText={(text) => formatWorkAmount(text, setPlannedEarning)}
-                  placeholder="0"
-                  placeholderTextColor={Colors.light.textTertiary}
-                  keyboardType="numeric"
-                />
-                <ThemedText type="body" style={styles.inputCurrency}>₽</ThemedText>
-              </View>
-
-              <ThemedText type="caption" style={styles.workLabel}>Сумма в цель</ThemedText>
-              <View style={styles.workInputContainer}>
-                <TextInput
-                  style={styles.workInput}
-                  value={plannedContribution}
-                  onChangeText={(text) => formatWorkAmount(text, setPlannedContribution)}
-                  placeholder="0"
-                  placeholderTextColor={Colors.light.textTertiary}
-                  keyboardType="numeric"
-                />
-                <ThemedText type="body" style={styles.inputCurrency}>₽</ThemedText>
-              </View>
-
-              {goals.filter(g => g.currentAmount < g.targetAmount).length > 1 && (
-                <>
-                  <ThemedText type="caption" style={styles.workLabel}>Цель</ThemedText>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.goalSelectScroll}
-                    contentContainerStyle={styles.goalSelectContent}
-                  >
-                    {goals.filter(g => g.currentAmount < g.targetAmount).map((goal) => {
-                      const remaining = goal.targetAmount - goal.currentAmount;
-                      const progressPercent = Math.round((goal.currentAmount / goal.targetAmount) * 100);
-                      return (
-                        <Pressable
-                          key={goal.id}
-                          style={[
-                            styles.goalSelectOptionWithProgress,
-                            selectedGoalId === goal.id && styles.goalSelectOptionSelected,
-                          ]}
-                          onPress={() => setSelectedGoalId(goal.id)}
-                        >
-                          <ThemedText 
-                            type="small"
-                            style={selectedGoalId === goal.id ? styles.goalSelectTextSelected : styles.goalSelectName}
-                            numberOfLines={1}
-                          >
-                            {goal.name}
-                          </ThemedText>
-                          <View style={styles.goalProgressMini}>
-                            <View style={styles.goalProgressBarMini}>
-                              <View 
-                                style={[
-                                  styles.goalProgressFillMini, 
-                                  { width: `${progressPercent}%` },
-                                  selectedGoalId === goal.id && styles.goalProgressFillSelected
-                                ]} 
-                              />
-                            </View>
-                            <ThemedText 
-                              type="caption" 
-                              style={selectedGoalId === goal.id ? styles.goalProgressTextSelected : styles.goalProgressText}
-                            >
-                              {formatCurrency(remaining)} ₽
-                            </ThemedText>
-                          </View>
-                        </Pressable>
-                      );
-                    })}
-                  </ScrollView>
-                </>
-              )}
-
-              {getRemainingFunds() > 0 && (
-                <View style={styles.remainingFundsCard}>
-                  <MaterialCommunityIcons
-                    name="wallet-outline"
-                    size={18}
-                    color={Colors.light.textSecondary}
-                  />
-                  <View style={styles.remainingFundsContent}>
-                    <ThemedText type="caption" style={styles.remainingFundsLabel}>Останется на руках</ThemedText>
-                    <ThemedText type="body" style={styles.remainingFundsAmount}>
-                      {formatCurrency(getRemainingFunds())} ₽
+                    <ThemedText 
+                      type="small"
+                      style={isSelected ? styles.dateTextSelected : undefined}
+                    >
+                      {option.label}
                     </ThemedText>
-                  </View>
-                </View>
-              )}
-
-              <View style={styles.modalActions}>
-                <Pressable
-                  onPress={handleCloseWorkModal}
-                  style={[styles.modalButton, styles.modalButtonCancel]}
-                >
-                  <ThemedText type="body" style={styles.cancelText}>Отмена</ThemedText>
-                </Pressable>
-                <Pressable
-                  onPress={handleSaveWorkSession}
-                  style={[styles.modalButton, styles.modalButtonConfirm]}
-                >
-                  <ThemedText type="body" style={styles.confirmText}>Сохранить</ThemedText>
-                </Pressable>
-              </View>
+                  </Pressable>
+                );
+              })}
             </ScrollView>
+
+            <ThemedText type="caption" style={styles.workLabel}>Смена</ThemedText>
+            <View style={styles.shiftOptions}>
+              <Pressable
+                style={[
+                  styles.shiftOption,
+                  shiftType === "day" && styles.shiftOptionSelected,
+                ]}
+                onPress={() => setShiftType("day")}
+              >
+                <MaterialCommunityIcons
+                  name="weather-sunny"
+                  size={18}
+                  color={shiftType === "day" ? Colors.light.buttonText : Colors.light.textSecondary}
+                />
+                <ThemedText 
+                  type="small"
+                  style={shiftType === "day" ? styles.shiftTextSelected : undefined}
+                >
+                  День
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.shiftOption,
+                  shiftType === "night" && styles.shiftOptionSelected,
+                ]}
+                onPress={() => setShiftType("night")}
+              >
+                <MaterialCommunityIcons
+                  name="weather-night"
+                  size={18}
+                  color={shiftType === "night" ? Colors.light.buttonText : Colors.light.textSecondary}
+                />
+                <ThemedText 
+                  type="small"
+                  style={shiftType === "night" ? styles.shiftTextSelected : undefined}
+                >
+                  Ночь
+                </ThemedText>
+              </Pressable>
+            </View>
+
+            <ThemedText type="caption" style={styles.workLabel}>Операция</ThemedText>
+            <View style={styles.shiftOptions}>
+              <Pressable
+                style={[
+                  styles.shiftOption,
+                  workOperation === "reception" && styles.shiftOptionSelected,
+                ]}
+                onPress={() => setWorkOperation("reception")}
+              >
+                <MaterialCommunityIcons
+                  name="package-variant"
+                  size={18}
+                  color={workOperation === "reception" ? Colors.light.buttonText : Colors.light.textSecondary}
+                />
+                <ThemedText 
+                  type="small"
+                  style={workOperation === "reception" ? styles.shiftTextSelected : undefined}
+                >
+                  Приёмка
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.shiftOption,
+                  workOperation === "returns" && styles.shiftOptionSelected,
+                ]}
+                onPress={() => setWorkOperation("returns")}
+              >
+                <MaterialCommunityIcons
+                  name="package-variant-closed-remove"
+                  size={18}
+                  color={workOperation === "returns" ? Colors.light.buttonText : Colors.light.textSecondary}
+                />
+                <ThemedText 
+                  type="small"
+                  style={workOperation === "returns" ? styles.shiftTextSelected : undefined}
+                >
+                  Возвраты
+                </ThemedText>
+              </Pressable>
+            </View>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={handleCloseWorkModal}
+                style={[styles.modalButton, styles.modalButtonCancel]}
+              >
+                <ThemedText type="body" style={styles.cancelText}>Отмена</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={handleSaveWorkSession}
+                style={[styles.modalButton, styles.modalButtonConfirm]}
+              >
+                <ThemedText type="body" style={styles.confirmText}>Добавить</ThemedText>
+              </Pressable>
+            </View>
           </Pressable>
         </Pressable>
       </Modal>
@@ -1552,7 +1242,7 @@ export default function GoalsScreen() {
                     {new Date(completingSession.date).toLocaleDateString("ru-RU", {
                       day: "numeric",
                       month: "long"
-                    })} • {completingSession.shiftType === "day" ? "Дневная" : "Ночная"}
+                    })} • {completingSession.shiftType === "day" ? "День" : "Ночь"}
                   </ThemedText>
                 )}
               </View>
@@ -1566,26 +1256,14 @@ export default function GoalsScreen() {
                   placeholder="0"
                   placeholderTextColor={Colors.light.textTertiary}
                   keyboardType="numeric"
+                  autoFocus
                 />
                 <ThemedText type="body" style={styles.inputCurrency}>₽</ThemedText>
               </View>
 
-              <ThemedText type="caption" style={styles.workLabel}>Сколько вложить в цель?</ThemedText>
-              <View style={styles.workInputContainer}>
-                <TextInput
-                  style={styles.workInput}
-                  value={actualContribution}
-                  onChangeText={(text) => formatActualAmount(text, setActualContribution)}
-                  placeholder="0"
-                  placeholderTextColor={Colors.light.textTertiary}
-                  keyboardType="numeric"
-                />
-                <ThemedText type="body" style={styles.inputCurrency}>₽</ThemedText>
-              </View>
-
-              {goals.filter(g => g.currentAmount < g.targetAmount).length > 1 && (
+              {goals.filter(g => g.currentAmount < g.targetAmount).length > 0 && (
                 <>
-                  <ThemedText type="caption" style={styles.workLabel}>Цель для взноса</ThemedText>
+                  <ThemedText type="caption" style={styles.workLabel}>Выберите цель</ThemedText>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -1594,12 +1272,11 @@ export default function GoalsScreen() {
                   >
                     {goals.filter(g => g.currentAmount < g.targetAmount).map((goal) => {
                       const remaining = goal.targetAmount - goal.currentAmount;
-                      const progressPercent = Math.round((goal.currentAmount / goal.targetAmount) * 100);
                       return (
                         <Pressable
                           key={goal.id}
                           style={[
-                            styles.goalSelectOptionWithProgress,
+                            styles.goalSelectOption,
                             completeGoalId === goal.id && styles.goalSelectOptionSelected,
                           ]}
                           onPress={() => setCompleteGoalId(goal.id)}
@@ -1611,23 +1288,12 @@ export default function GoalsScreen() {
                           >
                             {goal.name}
                           </ThemedText>
-                          <View style={styles.goalProgressMini}>
-                            <View style={styles.goalProgressBarMini}>
-                              <View 
-                                style={[
-                                  styles.goalProgressFillMini, 
-                                  { width: `${progressPercent}%` },
-                                  completeGoalId === goal.id && styles.goalProgressFillSelected
-                                ]} 
-                              />
-                            </View>
-                            <ThemedText 
-                              type="caption" 
-                              style={completeGoalId === goal.id ? styles.goalProgressTextSelected : styles.goalProgressText}
-                            >
-                              {formatCurrency(remaining)} ₽
-                            </ThemedText>
-                          </View>
+                          <ThemedText 
+                            type="caption" 
+                            style={completeGoalId === goal.id ? styles.goalRemainSelected : styles.goalRemain}
+                          >
+                            {formatCurrency(remaining)} ₽
+                          </ThemedText>
                         </Pressable>
                       );
                     })}
@@ -1635,15 +1301,32 @@ export default function GoalsScreen() {
                 </>
               )}
 
+              {completeGoalId && (
+                <>
+                  <ThemedText type="caption" style={styles.workLabel}>Сколько вложить в цель?</ThemedText>
+                  <View style={styles.workInputContainer}>
+                    <TextInput
+                      style={styles.workInput}
+                      value={actualContribution}
+                      onChangeText={(text) => formatActualAmount(text, setActualContribution)}
+                      placeholder="0"
+                      placeholderTextColor={Colors.light.textTertiary}
+                      keyboardType="numeric"
+                    />
+                    <ThemedText type="body" style={styles.inputCurrency}>₽</ThemedText>
+                  </View>
+                </>
+              )}
+
               {getActualFreeToSafe() > 0 && (
                 <View style={styles.freeToSafeCard}>
                   <MaterialCommunityIcons
                     name="safe"
-                    size={20}
+                    size={18}
                     color={Colors.light.success}
                   />
                   <View style={styles.freeToSafeContent}>
-                    <ThemedText type="caption" style={styles.freeToSafeLabel}>Свободные средства → Сейф</ThemedText>
+                    <ThemedText type="caption" style={styles.freeToSafeLabel}>В сейф</ThemedText>
                     <ThemedText type="body" style={styles.freeToSafeAmount}>
                       {formatCurrency(getActualFreeToSafe())} ₽
                     </ThemedText>
@@ -1658,10 +1341,10 @@ export default function GoalsScreen() {
                 >
                   <MaterialCommunityIcons
                     name="close-circle-outline"
-                    size={18}
+                    size={16}
                     color={Colors.light.error}
                   />
-                  <ThemedText type="small" style={styles.skipButtonText}>Не отработал</ThemedText>
+                  <ThemedText type="caption" style={styles.skipButtonText}>Не отработал</ThemedText>
                 </Pressable>
               </View>
 
@@ -1679,7 +1362,7 @@ export default function GoalsScreen() {
                   onPress={handleCompleteSession}
                   style={[styles.modalButton, styles.modalButtonConfirm]}
                 >
-                  <ThemedText type="body" style={styles.confirmText}>Завершить</ThemedText>
+                  <ThemedText type="body" style={styles.confirmText}>Готово</ThemedText>
                 </Pressable>
               </View>
             </ScrollView>
@@ -1705,22 +1388,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: Responsive.horizontalPadding,
   },
   headerSection: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   greetingRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: Spacing.xs,
+    marginBottom: 2,
   },
   greeting: {
     color: Colors.light.text,
   },
   addButton: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
     backgroundColor: Colors.light.primaryMuted,
-    borderRadius: BorderRadius.lg,
+    borderRadius: BorderRadius.md,
   },
   addButtonText: {
     color: Colors.light.primary,
@@ -1729,136 +1412,218 @@ const styles = StyleSheet.create({
   subtitle: {
     color: Colors.light.textSecondary,
   },
-  shiftsCard: {
+  activeShiftsCard: {
     backgroundColor: Colors.light.card,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.sm,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: Colors.light.warningMuted,
+  },
+  compactShiftsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  activeIndicatorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.light.warning,
+  },
+  compactShiftsTitle: {
+    color: Colors.light.text,
+    fontWeight: "500",
+    flex: 1,
+  },
+  activeShiftItem: {
+    paddingTop: Spacing.xs,
+  },
+  activeShiftRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  activeShiftInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+  },
+  activeShiftType: {
+    color: Colors.light.warning,
+    fontWeight: "600",
+  },
+  operationBadge: {
+    backgroundColor: Colors.light.backgroundSecondary,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 1,
+    borderRadius: BorderRadius.xs,
+  },
+  operationText: {
+    color: Colors.light.textSecondary,
+    fontSize: 10,
+  },
+  cancelButton: {
+    padding: Spacing.xs,
+  },
+  progressContainer: {
+    marginTop: Spacing.xs,
+  },
+  progressBar: {
+    height: 3,
+    backgroundColor: Colors.light.backgroundSecondary,
+    borderRadius: 2,
+    marginBottom: 2,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: Colors.light.warning,
+    borderRadius: 2,
+  },
+  progressText: {
+    color: Colors.light.textTertiary,
+    fontSize: 10,
+  },
+  progressRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  completeShiftBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    paddingHorizontal: Spacing.xs,
+    paddingVertical: 2,
+    backgroundColor: Colors.light.successMuted,
+    borderRadius: BorderRadius.xs,
+  },
+  completeShiftText: {
+    color: Colors.light.success,
+    fontSize: 10,
+    fontWeight: "500",
+  },
+  plannedShiftsCard: {
+    backgroundColor: Colors.light.card,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.sm,
+    marginBottom: Spacing.sm,
     borderWidth: 1,
     borderColor: Colors.light.cardBorder,
   },
-  shiftsHeader: {
+  addShiftBtn: {
+    padding: Spacing.xs,
+  },
+  plannedShiftsList: {},
+  plannedShiftItem: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: Spacing.md,
+    paddingVertical: Spacing.xs,
   },
-  shiftsHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  shiftsIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.light.primaryMuted,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  shiftsTitle: {
-    color: Colors.light.text,
-  },
-  addShiftButton: {
-    width: 32,
-    height: 32,
-    borderRadius: BorderRadius.full,
-    backgroundColor: Colors.light.primaryMuted,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  shiftsSummary: {
-    flexDirection: "row",
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-  },
-  shiftsSummaryItem: {
-    flex: 1,
-    alignItems: "center",
-  },
-  shiftsSummaryDivider: {
-    width: 1,
-    backgroundColor: Colors.light.border,
-    marginHorizontal: Spacing.md,
-  },
-  shiftsSummaryLabel: {
-    color: Colors.light.textTertiary,
-    marginBottom: 2,
-  },
-  shiftsSummaryValue: {
-    color: Colors.light.text,
-  },
-  shiftsSummaryValueAccent: {
-    color: Colors.light.success,
-  },
-  shiftsList: {
-    borderRadius: BorderRadius.md,
-    overflow: "hidden",
-  },
-  shiftItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: Spacing.sm,
-    gap: Spacing.md,
-  },
-  shiftItemBorder: {
+  plannedShiftItemBorder: {
     borderBottomWidth: 1,
     borderBottomColor: Colors.light.borderLight,
   },
-  shiftDate: {
-    minWidth: 60,
+  plannedShiftLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
   },
-  shiftDateText: {
+  plannedShiftDate: {
     color: Colors.light.text,
     fontWeight: "500",
   },
-  shiftType: {
+  opBadgeSmall: {
+    backgroundColor: Colors.light.backgroundSecondary,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+  },
+  opTextSmall: {
     color: Colors.light.textTertiary,
+    fontSize: 9,
   },
-  shiftAmounts: {
-    flex: 1,
-    alignItems: "flex-end",
+  plannedShiftRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
   },
-  shiftEarning: {
-    color: Colors.light.text,
-    fontWeight: "500",
+  timeUntilText: {
+    color: Colors.light.primary,
+    fontSize: 11,
   },
-  shiftContrib: {
-    color: Colors.light.success,
+  cancelBtnSmall: {
+    padding: 4,
   },
   addShiftCard: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: Colors.light.card,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
-    marginBottom: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.sm,
+    marginBottom: Spacing.sm,
     borderWidth: 1,
     borderColor: Colors.light.cardBorder,
-    gap: Spacing.md,
+    borderStyle: "dashed",
+    gap: Spacing.xs,
   },
-  addShiftIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.light.primaryMuted,
-    justifyContent: "center",
+  addShiftText: {
+    color: Colors.light.primary,
+    fontWeight: "500",
+  },
+  completedSection: {
+    backgroundColor: Colors.light.card,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.sm,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.light.cardBorder,
+  },
+  completedHeader: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
   },
-  addShiftContent: {
-    flex: 1,
-  },
-  addShiftTitle: {
+  completedTitle: {
     color: Colors.light.text,
     fontWeight: "500",
   },
-  addShiftSubtitle: {
+  completedTotal: {
+    color: Colors.light.success,
+    marginBottom: Spacing.sm,
+  },
+  barsContainer: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    height: 80,
+  },
+  barWrapper: {
+    alignItems: "center",
+    flex: 1,
+  },
+  barColumn: {
+    width: 20,
+    justifyContent: "flex-end",
+    height: 60,
+  },
+  bar: {
+    width: "100%",
+    backgroundColor: Colors.light.success,
+    borderRadius: 2,
+  },
+  barLabel: {
     color: Colors.light.textTertiary,
+    fontSize: 9,
+    marginTop: 2,
   },
   goalsSection: {
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
   modalOverlay: {
     flex: 1,
@@ -1870,18 +1635,18 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
+    padding: Spacing.md,
     width: "100%",
-    maxWidth: 340,
+    maxWidth: 320,
     borderWidth: 1,
     borderColor: Colors.light.cardBorder,
   },
   overflowModalContent: {
     backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
+    padding: Spacing.md,
     width: "100%",
-    maxWidth: 340,
+    maxWidth: 320,
     maxHeight: "70%",
     borderWidth: 1,
     borderColor: Colors.light.cardBorder,
@@ -1889,37 +1654,36 @@ const styles = StyleSheet.create({
   workModalContent: {
     backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
+    padding: Spacing.md,
     width: "100%",
-    maxWidth: 380,
-    maxHeight: "85%",
+    maxWidth: 340,
     borderWidth: 1,
     borderColor: Colors.light.cardBorder,
   },
   modalHeader: {
     alignItems: "center",
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   modalSubtitle: {
     color: Colors.light.textSecondary,
-    marginTop: 4,
+    marginTop: 2,
   },
   modalHint: {
     color: Colors.light.textTertiary,
-    marginTop: 4,
+    marginTop: 2,
   },
   quickAddInputContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   quickAddInput: {
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: "700",
     color: Colors.light.text,
     textAlign: "center",
-    minWidth: 80,
+    minWidth: 60,
   },
   currencyLabel: {
     color: Colors.light.textTertiary,
@@ -1930,8 +1694,8 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
     alignItems: "center",
   },
   modalButtonCancel: {
@@ -1957,10 +1721,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: Spacing.sm,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
     backgroundColor: Colors.light.successMuted,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   safeButtonText: {
     color: Colors.light.success,
@@ -1969,18 +1733,18 @@ const styles = StyleSheet.create({
   orText: {
     color: Colors.light.textTertiary,
     textAlign: "center",
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   overflowGoalsList: {
-    maxHeight: 180,
-    marginBottom: Spacing.md,
+    maxHeight: 160,
+    marginBottom: Spacing.sm,
   },
   overflowGoalItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.md,
     backgroundColor: Colors.light.backgroundSecondary,
     marginBottom: Spacing.xs,
   },
@@ -1992,20 +1756,21 @@ const styles = StyleSheet.create({
   },
   workLabel: {
     color: Colors.light.textTertiary,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
     textTransform: "uppercase",
     letterSpacing: 0.5,
+    fontSize: 10,
   },
   dateScroll: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   dateScrollContent: {
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   dateOption: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.md,
     backgroundColor: Colors.light.backgroundSecondary,
   },
   dateOptionSelected: {
@@ -2024,25 +1789,25 @@ const styles = StyleSheet.create({
   dateTextCustom: {
     color: Colors.light.textSecondary,
   },
-  workOperationOptions: {
+  shiftOptions: {
     flexDirection: "row",
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    gap: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
-  workOperationOption: {
+  shiftOption: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: Spacing.xs,
-    paddingVertical: Spacing.md,
-    borderRadius: BorderRadius.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.md,
     backgroundColor: Colors.light.backgroundSecondary,
   },
-  workOperationOptionSelected: {
+  shiftOptionSelected: {
     backgroundColor: Colors.light.primary,
   },
-  workOperationTextSelected: {
+  shiftTextSelected: {
     color: Colors.light.buttonText,
     fontWeight: "600",
   },
@@ -2050,32 +1815,32 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: BorderRadius.lg,
-    paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.sm,
+    marginBottom: Spacing.sm,
   },
   workInput: {
     flex: 1,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "600",
     color: Colors.light.text,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
   inputCurrency: {
     color: Colors.light.textTertiary,
   },
   goalSelectScroll: {
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   goalSelectContent: {
-    gap: Spacing.sm,
+    gap: Spacing.xs,
   },
   goalSelectOption: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.md,
     backgroundColor: Colors.light.backgroundSecondary,
-    maxWidth: 140,
+    minWidth: 100,
   },
   goalSelectOptionSelected: {
     backgroundColor: Colors.light.primary,
@@ -2084,31 +1849,23 @@ const styles = StyleSheet.create({
     color: Colors.light.buttonText,
     fontWeight: "600",
   },
-  remainingFundsCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    gap: Spacing.sm,
-  },
-  remainingFundsContent: {
-    flex: 1,
-  },
-  remainingFundsLabel: {
-    color: Colors.light.textTertiary,
-  },
-  remainingFundsAmount: {
+  goalSelectName: {
     color: Colors.light.text,
-    fontWeight: "600",
+  },
+  goalRemain: {
+    color: Colors.light.textTertiary,
+    fontSize: 10,
+  },
+  goalRemainSelected: {
+    color: "rgba(255, 255, 255, 0.7)",
+    fontSize: 10,
   },
   calendarContent: {
     backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
+    padding: Spacing.md,
     width: "100%",
-    maxWidth: 340,
+    maxWidth: 320,
     borderWidth: 1,
     borderColor: Colors.light.cardBorder,
   },
@@ -2116,7 +1873,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   calendarNavButton: {
     padding: Spacing.xs,
@@ -2141,7 +1898,7 @@ const styles = StyleSheet.create({
   calendarGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   calendarDay: {
     width: "14.28%",
@@ -2165,7 +1922,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.light.primary,
   },
   calendarDayText: {
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.light.text,
   },
   calendarDayTextDisabled: {
@@ -2175,131 +1932,13 @@ const styles = StyleSheet.create({
     color: Colors.light.buttonText,
     fontWeight: "600",
   },
-  completeShiftBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.light.primary,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    gap: Spacing.md,
-  },
-  completeShiftBannerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: BorderRadius.md,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  completeShiftBannerContent: {
-    flex: 1,
-  },
-  completeShiftBannerTitle: {
-    color: Colors.light.buttonText,
-    fontWeight: "600",
-  },
-  completeShiftBannerSubtitle: {
-    color: "rgba(255,255,255,0.8)",
-  },
-  shiftsSummaryThree: {
-    flexDirection: "row",
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  shiftsSummaryItemThree: {
-    flex: 1,
-    alignItems: "center",
-    paddingHorizontal: Spacing.xs,
-  },
-  shiftsSummaryDividerVertical: {
-    width: 1,
-    backgroundColor: Colors.light.border,
-    marginVertical: 4,
-  },
-  shiftsSummaryValueSuccess: {
-    color: Colors.light.success,
-  },
-  shiftItemNew: {
-    paddingVertical: Spacing.md,
-  },
-  shiftItemHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: Spacing.sm,
-  },
-  shiftDateNew: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-  },
-  shiftDateTextNew: {
-    color: Colors.light.text,
-    fontWeight: "600",
-  },
-  shiftTypeBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    gap: 4,
-  },
-  shiftTypeText: {
-    color: Colors.light.textSecondary,
-  },
-  shiftDeleteButton: {
-    padding: Spacing.xs,
-  },
-  shiftDetailsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.md,
-  },
-  shiftDetailItem: {
-    minWidth: 80,
-  },
-  shiftDetailLabel: {
-    color: Colors.light.textTertiary,
-    marginBottom: 2,
-  },
-  shiftDetailValue: {
-    color: Colors.light.text,
-    fontWeight: "500",
-  },
-  shiftDetailValueAccent: {
-    color: Colors.light.primary,
-    fontWeight: "500",
-  },
-  shiftDetailValueSuccess: {
-    color: Colors.light.success,
-    fontWeight: "500",
-  },
-  completeShiftButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.xs,
-    marginTop: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.light.primaryMuted,
-    borderRadius: BorderRadius.md,
-  },
-  completeShiftButtonText: {
-    color: Colors.light.primary,
-    fontWeight: "500",
-  },
   completeModalContent: {
     backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
+    padding: Spacing.md,
     width: "100%",
-    maxWidth: 380,
-    maxHeight: "80%",
+    maxWidth: 340,
+    maxHeight: "75%",
     borderWidth: 1,
     borderColor: Colors.light.cardBorder,
   },
@@ -2307,16 +1946,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.light.successMuted,
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    gap: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    padding: Spacing.sm,
+    marginBottom: Spacing.sm,
+    gap: Spacing.xs,
   },
   freeToSafeContent: {
     flex: 1,
   },
   freeToSafeLabel: {
     color: Colors.light.success,
+    fontSize: 10,
   },
   freeToSafeAmount: {
     color: Colors.light.success,
@@ -2324,134 +1964,17 @@ const styles = StyleSheet.create({
   },
   completeActionsRow: {
     alignItems: "center",
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   skipButton: {
     flexDirection: "row",
     alignItems: "center",
     gap: Spacing.xs,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.xs,
   },
   skipButtonText: {
     color: Colors.light.error,
     fontWeight: "500",
-  },
-  activeShiftsCard: {
-    backgroundColor: Colors.light.card,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.light.shift.activeBg,
-  },
-  activeShiftsIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: BorderRadius.md,
-    backgroundColor: Colors.light.warningMuted,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  activeIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.light.warning,
-  },
-  shiftDateTextActive: {
-    color: Colors.light.warning,
-    fontWeight: "600",
-  },
-  progressContainer: {
-    marginBottom: Spacing.sm,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: 2,
-    marginBottom: 4,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    backgroundColor: Colors.light.warning,
-    borderRadius: 2,
-  },
-  progressText: {
-    color: Colors.light.textTertiary,
-    fontSize: 11,
-  },
-  completeActiveShiftButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: Spacing.xs,
-    marginTop: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    backgroundColor: Colors.light.warning,
-    borderRadius: BorderRadius.md,
-  },
-  completeActiveShiftButtonText: {
-    color: Colors.light.buttonText,
-    fontWeight: "600",
-  },
-  timeUntilBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.light.primaryMuted,
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    gap: 3,
-  },
-  timeUntilText: {
-    color: Colors.light.primary,
-    fontSize: 11,
-  },
-  goalSelectOptionWithProgress: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.lg,
-    backgroundColor: Colors.light.backgroundSecondary,
-    minWidth: 120,
-    maxWidth: 160,
-  },
-  goalSelectName: {
-    color: Colors.light.text,
-  },
-  goalProgressMini: {
-    marginTop: 4,
-  },
-  goalProgressBarMini: {
-    height: 3,
-    backgroundColor: Colors.light.backgroundTertiary,
-    borderRadius: 2,
-    marginBottom: 3,
-    overflow: "hidden",
-  },
-  goalProgressFillMini: {
-    height: "100%",
-    backgroundColor: Colors.light.primary,
-    borderRadius: 2,
-  },
-  goalProgressFillSelected: {
-    backgroundColor: "rgba(255, 255, 255, 0.5)",
-  },
-  goalProgressText: {
-    color: Colors.light.textTertiary,
-    fontSize: 10,
-  },
-  goalProgressTextSelected: {
-    color: "rgba(255, 255, 255, 0.8)",
-    fontSize: 10,
-  },
-  expiredShiftBanner: {
-    backgroundColor: Colors.light.warning,
-  },
-  expiredShiftBannerIcon: {
-    backgroundColor: "rgba(0,0,0,0.15)",
-  },
-  expiredShiftBannerSubtitle: {
-    color: "rgba(255,255,255,0.9)",
+    fontSize: 12,
   },
 });

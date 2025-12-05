@@ -499,11 +499,11 @@ export const storage = {
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   },
 
-  async autoCompleteExpiredSessions(): Promise<{ completed: number; sessions: WorkSession[] }> {
+  async autoCompleteExpiredSessions(): Promise<{ skipped: number; sessions: WorkSession[] }> {
     const sessions = await this.getWorkSessions();
     const now = new Date();
-    const completedSessions: WorkSession[] = [];
-    let completedCount = 0;
+    const skippedSessions: WorkSession[] = [];
+    let skippedCount = 0;
 
     for (const session of sessions) {
       if (session.isCompleted || session.status === "completed" || session.status === "skipped") {
@@ -521,17 +521,12 @@ export const storage = {
       shiftEndDate.setHours(shiftEndDate.getHours() + 12);
 
       if (now >= shiftEndDate) {
-        await this.completeWorkSession(
-          session.id,
-          session.plannedEarning,
-          session.plannedContribution,
-          session.goalId
-        );
-        completedSessions.push(session);
-        completedCount++;
+        await this.skipWorkSession(session.id);
+        skippedSessions.push(session);
+        skippedCount++;
       }
     }
 
-    return { completed: completedCount, sessions: completedSessions };
+    return { skipped: skippedCount, sessions: skippedSessions };
   },
 };
