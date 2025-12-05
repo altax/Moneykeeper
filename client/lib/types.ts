@@ -20,11 +20,13 @@ export interface Contribution {
 }
 
 export type WorkOperationType = "reception" | "returns";
+export type ShiftType = "day" | "night";
 
 export interface WorkSession {
   id: string;
   date: string;
   operationType: WorkOperationType;
+  shiftType: ShiftType;
   plannedEarning: number;
   plannedContribution: number;
   goalId?: string;

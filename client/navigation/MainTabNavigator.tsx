@@ -31,7 +31,7 @@ export default function MainTabNavigator() {
         tabBarStyle: {
           position: "absolute",
           backgroundColor: Platform.select({
-            ios: "rgba(255, 255, 255, 0.95)",
+            ios: "rgba(26, 26, 26, 0.95)",
             android: Colors.light.backgroundRoot,
             web: Colors.light.backgroundRoot,
           }),
@@ -40,14 +40,14 @@ export default function MainTabNavigator() {
           elevation: 0,
           shadowColor: "#000",
           shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.05,
+          shadowOpacity: 0.3,
           shadowRadius: 8,
         },
         tabBarBackground: () =>
           Platform.OS === "ios" ? (
             <BlurView
               intensity={100}
-              tint="light"
+              tint="dark"
               style={StyleSheet.absoluteFill}
             />
           ) : null,
