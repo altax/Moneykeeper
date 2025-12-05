@@ -223,11 +223,93 @@ export default function GoalsScreen() {
     setter(number.toLocaleString("ru-RU"));
   };
 
-  const getDateOptions = (): { date: Date; label: string }[] => {
-    const options: { date: Date; label: string }[] = [];
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [customDate, setCustomDate] = useState<Date>(new Date());
+  const [pickerMonth, setPickerMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+
+  const getMonthDays = (monthDate: Date): (Date | null)[] => {
+    const year = monthDate.getFullYear();
+    const month = monthDate.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const days: (Date | null)[] = [];
+    
+    let startDay = firstDay.getDay();
+    if (startDay === 0) startDay = 7;
+    for (let i = 1; i < startDay; i++) {
+      days.push(null);
+    }
+    
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      days.push(new Date(year, month, d));
+    }
+    
+    return days;
+  };
+
+  const isDateDisabled = (date: Date): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+    return checkDate < today;
+  };
+
+  const formatMonthYear = (date: Date): string => {
+    return date.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
+  };
+
+  const handlePickerDateSelect = (date: Date) => {
+    if (!isDateDisabled(date)) {
+      setCustomDate(date);
+    }
+  };
+
+  const handleOpenDatePicker = () => {
+    setCustomDate(selectedDate);
+    setPickerMonth(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+    setShowDatePicker(true);
+  };
+
+  const handleConfirmCustomDate = () => {
+    if (isDateDisabled(customDate)) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      setSelectedDate(today);
+    } else {
+      setSelectedDate(customDate);
+    }
+    setShowDatePicker(false);
+  };
+
+  const handlePrevMonth = () => {
+    const now = new Date();
+    const targetMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1);
+    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    if (targetMonth >= currentMonth) {
+      setPickerMonth(targetMonth);
+    }
+  };
+
+  const handleNextMonth = () => {
+    setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1));
+  };
+
+  const canNavigatePrevMonth = () => {
+    const now = new Date();
+    const targetMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1);
+    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    return targetMonth >= currentMonth;
+  };
+
+  const getDateOptions = (): { date: Date; label: string; isCustom?: boolean }[] => {
+    const options: { date: Date; label: string; isCustom?: boolean }[] = [];
     const today = new Date();
     
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 30; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
       
@@ -248,6 +330,8 @@ export default function GoalsScreen() {
       
       options.push({ date, label });
     }
+    
+    options.push({ date: new Date(), label: "Другая дата...", isCustom: true });
     
     return options;
   };
@@ -294,6 +378,32 @@ export default function GoalsScreen() {
         },
       ]
     );
+  };
+
+  const handleCloseWorkModal = () => {
+    const hasData = plannedEarning.length > 0 || plannedContribution.length > 0;
+    
+    if (hasData) {
+      Alert.alert(
+        "Отменить запись?",
+        "Вы ввели данные. Уверены, что хотите отменить?",
+        [
+          { text: "Продолжить", style: "cancel" },
+          {
+            text: "Отменить запись",
+            style: "destructive",
+            onPress: () => {
+              setShowWorkModal(false);
+              setPlannedEarning("");
+              setPlannedContribution("");
+              setSelectedDate(new Date());
+            },
+          },
+        ]
+      );
+    } else {
+      setShowWorkModal(false);
+    }
   };
 
   const calculateDaysToGoal = (goal: Goal): number | null => {
@@ -386,7 +496,7 @@ export default function GoalsScreen() {
           {workSessions.length > 0 ? (
             <View style={styles.workSessionsContainer}>
               <View style={styles.workSessionsHeader}>
-                <ThemedText type="h4">Запланированные смены</ThemedText>
+                <ThemedText type="h4">Запланированные смены ({workSessions.length})</ThemedText>
                 <Pressable onPress={() => setShowWorkModal(true)}>
                   <MaterialCommunityIcons
                     name="plus-circle"
@@ -396,62 +506,71 @@ export default function GoalsScreen() {
                 </Pressable>
               </View>
               
-              {workSessions.length > 1 && (
-                <View style={styles.totalStats}>
-                  <View style={styles.totalStat}>
-                    <ThemedText type="caption" secondary>Всего заработок</ThemedText>
-                    <ThemedText type="body" style={styles.totalAmount}>
-                      {formatCurrency(getTotalPlannedEarnings())} руб.
-                    </ThemedText>
-                  </View>
-                  <View style={styles.totalStat}>
-                    <ThemedText type="caption" secondary>Всего вложу</ThemedText>
-                    <ThemedText type="body" style={styles.totalContribution}>
-                      {formatCurrency(getTotalPlannedContributions())} руб.
-                    </ThemedText>
-                  </View>
+              <View style={styles.totalStatsCompact}>
+                <View style={styles.totalStatCompact}>
+                  <MaterialCommunityIcons name="cash-plus" size={16} color={Colors.light.primary} />
+                  <ThemedText type="body" style={styles.totalAmount}>
+                    {formatCurrency(getTotalPlannedEarnings())}
+                  </ThemedText>
                 </View>
-              )}
+                <View style={styles.totalStatCompact}>
+                  <MaterialCommunityIcons name="arrow-right" size={14} color={Colors.light.textSecondary} />
+                  <ThemedText type="body" style={styles.totalContribution}>
+                    {formatCurrency(getTotalPlannedContributions())} в цель
+                  </ThemedText>
+                </View>
+                <View style={styles.totalStatCompact}>
+                  <MaterialCommunityIcons name="wallet" size={14} color={Colors.light.textSecondary} />
+                  <ThemedText type="caption" secondary>
+                    Останется: {formatCurrency(getTotalPlannedEarnings() - getTotalPlannedContributions())}
+                  </ThemedText>
+                </View>
+              </View>
 
-              {workSessions.map((session) => (
-                <Pressable
-                  key={session.id}
-                  style={styles.workCard}
-                  onPress={() => handleCancelWorkSession(session)}
-                >
-                  <View style={styles.workCardHeader}>
-                    <View style={styles.workIconContainer}>
+              <View style={styles.workSessionsCompact}>
+                {workSessions.map((session, index) => (
+                  <Pressable
+                    key={session.id}
+                    style={[
+                      styles.workCardCompact,
+                      index < workSessions.length - 1 && styles.workCardCompactBorder
+                    ]}
+                    onPress={() => handleCancelWorkSession(session)}
+                  >
+                    <View style={[
+                      styles.workIconSmall,
+                      session.operationType === "returns" && styles.workIconReturns
+                    ]}>
                       <MaterialCommunityIcons
                         name={session.operationType === "reception" ? "package-variant" : "package-variant-closed-remove"}
-                        size={20}
-                        color={Colors.light.primary}
+                        size={14}
+                        color={session.operationType === "reception" ? Colors.light.primary : Colors.light.warning}
                       />
                     </View>
-                    <View style={styles.workCardContent}>
-                      <ThemedText type="body" style={styles.workTitle}>
-                        {session.operationType === "reception" ? "Приёмка" : "Возвраты"}
-                      </ThemedText>
-                      <ThemedText type="caption" secondary>
-                        {new Date(session.date).toLocaleDateString("ru-RU", { 
-                          day: "numeric", 
-                          month: "long",
-                          weekday: "short"
-                        })}
-                      </ThemedText>
-                    </View>
-                    <View style={styles.workAmounts}>
-                      <ThemedText type="small" style={styles.workEarning}>
+                    <ThemedText type="small" style={styles.workDateCompact}>
+                      {new Date(session.date).toLocaleDateString("ru-RU", { 
+                        day: "numeric", 
+                        month: "short"
+                      })}
+                    </ThemedText>
+                    <View style={styles.workAmountsCompact}>
+                      <ThemedText type="small" style={styles.workEarningCompact}>
                         +{formatCurrency(session.plannedEarning)}
                       </ThemedText>
                       {session.plannedContribution > 0 && (
-                        <ThemedText type="caption" style={styles.workContrib}>
-                          -{formatCurrency(session.plannedContribution)} на цель
+                        <ThemedText type="caption" style={styles.workContribCompact}>
+                          -{formatCurrency(session.plannedContribution)}
                         </ThemedText>
                       )}
                     </View>
-                  </View>
-                </Pressable>
-              ))}
+                    <MaterialCommunityIcons
+                      name="close-circle-outline"
+                      size={16}
+                      color={Colors.light.textDisabled}
+                    />
+                  </Pressable>
+                ))}
+              </View>
             </View>
           ) : (
             <Pressable style={styles.workPromptCard} onPress={() => setShowWorkModal(true)}>
@@ -615,13 +734,10 @@ export default function GoalsScreen() {
         visible={showWorkModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowWorkModal(false)}
+        onRequestClose={handleCloseWorkModal}
       >
-        <Pressable 
-          style={styles.modalOverlay}
-          onPress={() => setShowWorkModal(false)}
-        >
-          <Pressable style={styles.workModalContent} onPress={() => {}}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.workModalContent}>
             <View style={styles.modalHeader}>
               <ThemedText type="h4">Планирование смены</ThemedText>
               <ThemedText type="small" secondary>
@@ -635,20 +751,35 @@ export default function GoalsScreen() {
               style={styles.dateScroll}
               contentContainerStyle={styles.dateScrollContent}
             >
-              {getDateOptions().map(({ date, label }) => {
-                const isSelected = date.toDateString() === selectedDate.toDateString();
+              {getDateOptions().map(({ date, label, isCustom }, index) => {
+                const isSelected = !isCustom && date.toDateString() === selectedDate.toDateString();
                 return (
                   <Pressable
-                    key={date.toISOString()}
+                    key={isCustom ? "custom" : date.toISOString()}
                     style={[
                       styles.dateOption,
-                      isSelected && styles.dateOptionSelected
+                      isSelected && styles.dateOptionSelected,
+                      isCustom && styles.dateOptionCustom,
                     ]}
-                    onPress={() => setSelectedDate(date)}
+                    onPress={() => {
+                      if (isCustom) {
+                        handleOpenDatePicker();
+                      } else {
+                        setSelectedDate(date);
+                      }
+                    }}
                   >
+                    {isCustom && (
+                      <MaterialCommunityIcons
+                        name="calendar"
+                        size={14}
+                        color={Colors.light.textSecondary}
+                        style={{ marginRight: 4 }}
+                      />
+                    )}
                     <ThemedText 
                       type="small" 
-                      style={isSelected ? styles.dateTextSelected : undefined}
+                      style={isSelected ? styles.dateTextSelected : (isCustom ? styles.dateTextCustom : undefined)}
                     >
                       {label}
                     </ThemedText>
@@ -751,7 +882,7 @@ export default function GoalsScreen() {
 
             <View style={styles.modalActions}>
               <Pressable
-                onPress={() => setShowWorkModal(false)}
+                onPress={handleCloseWorkModal}
                 style={[styles.modalButton, styles.modalButtonCancel]}
               >
                 <ThemedText type="body" secondary>Отмена</ThemedText>
@@ -761,6 +892,114 @@ export default function GoalsScreen() {
                 style={[styles.modalButton, styles.modalButtonConfirm]}
               >
                 <ThemedText type="body" style={styles.confirmText}>Добавить</ThemedText>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => setShowDatePicker(false)}
+        >
+          <Pressable style={styles.calendarContent} onPress={() => {}}>
+            <View style={styles.modalHeader}>
+              <ThemedText type="h4">Выберите дату</ThemedText>
+            </View>
+            
+            <View style={styles.calendarNavigation}>
+              <Pressable 
+                onPress={handlePrevMonth} 
+                style={[styles.calendarNavButton, !canNavigatePrevMonth() && styles.calendarNavButtonDisabled]}
+                disabled={!canNavigatePrevMonth()}
+              >
+                <MaterialCommunityIcons 
+                  name="chevron-left" 
+                  size={24} 
+                  color={canNavigatePrevMonth() ? Colors.light.text : Colors.light.textDisabled} 
+                />
+              </Pressable>
+              <ThemedText type="body" style={styles.calendarMonthTitle}>
+                {formatMonthYear(pickerMonth)}
+              </ThemedText>
+              <Pressable onPress={handleNextMonth} style={styles.calendarNavButton}>
+                <MaterialCommunityIcons name="chevron-right" size={24} color={Colors.light.text} />
+              </Pressable>
+            </View>
+
+            <View style={styles.calendarWeekHeader}>
+              {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((day) => (
+                <ThemedText key={day} type="caption" secondary style={styles.calendarWeekDay}>
+                  {day}
+                </ThemedText>
+              ))}
+            </View>
+
+            <View style={styles.calendarGrid}>
+              {getMonthDays(pickerMonth).map((date, index) => {
+                if (!date) {
+                  return <View key={`empty-${index}`} style={styles.calendarDayEmpty} />;
+                }
+                const disabled = isDateDisabled(date);
+                const isSelected = date.toDateString() === customDate.toDateString();
+                const isToday = date.toDateString() === new Date().toDateString();
+                return (
+                  <Pressable
+                    key={date.toISOString()}
+                    style={[
+                      styles.calendarDay,
+                      disabled && styles.calendarDayDisabled,
+                      isSelected && styles.calendarDaySelected,
+                      isToday && !isSelected && styles.calendarDayToday,
+                    ]}
+                    onPress={() => handlePickerDateSelect(date)}
+                    disabled={disabled}
+                  >
+                    <ThemedText
+                      type="body"
+                      style={[
+                        styles.calendarDayText,
+                        disabled && styles.calendarDayTextDisabled,
+                        isSelected && styles.calendarDayTextSelected,
+                      ]}
+                    >
+                      {date.getDate()}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.calendarSelectedInfo}>
+              <ThemedText type="small" secondary>Выбранная дата:</ThemedText>
+              <ThemedText type="body" style={styles.calendarSelectedDate}>
+                {customDate.toLocaleDateString("ru-RU", { 
+                  weekday: "long",
+                  day: "numeric", 
+                  month: "long",
+                  year: "numeric"
+                })}
+              </ThemedText>
+            </View>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                onPress={() => setShowDatePicker(false)}
+                style={[styles.modalButton, styles.modalButtonCancel]}
+              >
+                <ThemedText type="body" secondary>Отмена</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={handleConfirmCustomDate}
+                style={[styles.modalButton, styles.modalButtonConfirm]}
+              >
+                <ThemedText type="body" style={styles.confirmText}>Выбрать</ThemedText>
               </Pressable>
             </View>
           </Pressable>
@@ -815,16 +1054,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: Spacing.sm,
   },
-  totalStats: {
+  totalStatsCompact: {
     flexDirection: "row",
-    gap: Spacing.md,
+    flexWrap: "wrap",
+    gap: Spacing.sm,
     marginBottom: Spacing.sm,
     padding: Spacing.sm,
     backgroundColor: Colors.light.backgroundSecondary,
     borderRadius: BorderRadius.md,
+    alignItems: "center",
   },
-  totalStat: {
-    flex: 1,
+  totalStatCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   totalAmount: {
     color: Colors.light.primary,
@@ -834,44 +1077,50 @@ const styles = StyleSheet.create({
     color: Colors.light.success,
     fontWeight: "600",
   },
-  workCard: {
+  workSessionsCompact: {
     backgroundColor: Colors.light.card,
     borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
   },
-  workCardHeader: {
+  workCardCompact: {
     flexDirection: "row",
     alignItems: "center",
+    padding: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.sm,
   },
-  workIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  workCardCompactBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.border,
+  },
+  workIconSmall: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: "rgba(0, 91, 255, 0.1)",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: Spacing.sm,
   },
-  workCardContent: {
+  workIconReturns: {
+    backgroundColor: "rgba(245, 158, 11, 0.1)",
+  },
+  workDateCompact: {
+    minWidth: 50,
+    color: Colors.light.textSecondary,
+  },
+  workAmountsCompact: {
     flex: 1,
-  },
-  workTitle: {
-    fontWeight: "600",
-  },
-  workAmounts: {
     alignItems: "flex-end",
   },
-  workEarning: {
+  workEarningCompact: {
     color: Colors.light.primary,
     fontWeight: "600",
   },
-  workContrib: {
+  workContribCompact: {
     color: Colors.light.success,
   },
   workPromptCard: {
@@ -1013,6 +1262,94 @@ const styles = StyleSheet.create({
   dateTextSelected: {
     color: Colors.light.buttonText,
     fontWeight: "600",
+  },
+  dateOptionCustom: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderStyle: "dashed",
+  },
+  dateTextCustom: {
+    color: Colors.light.textSecondary,
+  },
+  calendarContent: {
+    backgroundColor: Colors.light.card,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.lg,
+    width: "100%",
+    maxWidth: 340,
+  },
+  calendarNavigation: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.md,
+  },
+  calendarNavButton: {
+    padding: Spacing.xs,
+  },
+  calendarNavButtonDisabled: {
+    opacity: 0.3,
+  },
+  calendarMonthTitle: {
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
+  calendarWeekHeader: {
+    flexDirection: "row",
+    marginBottom: Spacing.xs,
+  },
+  calendarWeekDay: {
+    flex: 1,
+    textAlign: "center",
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  calendarDay: {
+    width: "14.28%",
+    aspectRatio: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 20,
+  },
+  calendarDayEmpty: {
+    width: "14.28%",
+    aspectRatio: 1,
+  },
+  calendarDayDisabled: {
+    opacity: 0.3,
+  },
+  calendarDaySelected: {
+    backgroundColor: Colors.light.primary,
+  },
+  calendarDayToday: {
+    borderWidth: 1,
+    borderColor: Colors.light.primary,
+  },
+  calendarDayText: {
+    fontSize: 14,
+  },
+  calendarDayTextDisabled: {
+    color: Colors.light.textDisabled,
+  },
+  calendarDayTextSelected: {
+    color: Colors.light.buttonText,
+    fontWeight: "600",
+  },
+  calendarSelectedInfo: {
+    marginTop: Spacing.md,
+    padding: Spacing.sm,
+    backgroundColor: Colors.light.backgroundSecondary,
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+  },
+  calendarSelectedDate: {
+    fontWeight: "600",
+    color: Colors.light.primary,
+    textTransform: "capitalize",
   },
   workLabel: {
     marginBottom: Spacing.sm,
