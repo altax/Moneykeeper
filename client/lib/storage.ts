@@ -48,6 +48,15 @@ export const storage = {
     }
   },
 
+  async isGoalNameUnique(name: string, excludeId?: string): Promise<boolean> {
+    const goals = await this.getActiveGoals();
+    const trimmedName = name.trim().toLowerCase();
+    return !goals.some((g) => {
+      if (excludeId && g.id === excludeId) return false;
+      return g.name.trim().toLowerCase() === trimmedName;
+    });
+  },
+
   async addGoal(goal: Omit<Goal, "id" | "currentAmount" | "createdAt" | "updatedAt">): Promise<Goal> {
     const goals = await this.getGoals();
     const newGoal: Goal = {
@@ -244,7 +253,26 @@ export const storage = {
     }
   },
 
-  async addWorkSession(session: Omit<WorkSession, "id" | "createdAt">): Promise<WorkSession> {
+  async isDuplicateShift(date: Date, shiftType: ShiftType): Promise<boolean> {
+    const sessions = await this.getWorkSessions();
+    const dateString = date.toISOString().split("T")[0];
+
+    return sessions.some((session) => {
+      const sessionDateString = new Date(session.date).toISOString().split("T")[0];
+      return (
+        sessionDateString === dateString &&
+        session.shiftType === shiftType &&
+        !session.isCompleted
+      );
+    });
+  },
+
+  async addWorkSession(session: Omit<WorkSession, "id" | "createdAt">): Promise<WorkSession | null> {
+    const isDuplicate = await this.isDuplicateShift(new Date(session.date), session.shiftType);
+    if (isDuplicate) {
+      return null;
+    }
+
     const sessions = await this.getWorkSessions();
     const newSession: WorkSession = {
       ...session,
@@ -411,7 +439,6 @@ export const storage = {
     if (index === -1) return null;
 
     const session = sessions[index];
-    const freeToSafe = Math.max(0, actualEarning - actualContribution);
 
     sessions[index] = {
       ...session,
@@ -433,13 +460,7 @@ export const storage = {
       });
     }
 
-    if (freeToSafe > 0) {
-      const sessionDate = new Date(session.date).toLocaleDateString("ru-RU", {
-        day: "numeric",
-        month: "short",
-      });
-      await this.addToSafe(freeToSafe, `Свободные средства (${sessionDate})`);
-    }
+    await this.updateAverageDailyEarning();
 
     return sessions[index];
   },
@@ -529,5 +550,124 @@ export const storage = {
 
   async autoCompleteExpiredSessions(): Promise<{ skipped: number; sessions: WorkSession[] }> {
     return { skipped: 0, sessions: [] };
+  },
+
+  async updateAverageDailyEarning(): Promise<void> {
+    const completedSessions = await this.getCompletedWorkSessions();
+    const last30Days = new Date();
+    last30Days.setDate(last30Days.getDate() - 30);
+
+    const recentSessions = completedSessions.filter((s) => {
+      const date = new Date(s.completedAt || s.date);
+      return date >= last30Days;
+    });
+
+    if (recentSessions.length === 0) return;
+
+    const totalEarnings = recentSessions.reduce((sum, s) => sum + (s.actualEarning || 0), 0);
+    const daysWithShifts = new Set(
+      recentSessions.map((s) => new Date(s.date).toDateString())
+    ).size;
+
+    const averagePerShiftDay = daysWithShifts > 0 ? totalEarnings / daysWithShifts : 0;
+
+    const settings = await this.getSettings();
+    settings.averageDailyEarning = Math.round(averagePerShiftDay);
+    await this.saveSettings(settings);
+  },
+
+  async calculateDaysToGoal(goalId: string): Promise<number | null> {
+    const goals = await this.getGoals();
+    const goal = goals.find((g) => g.id === goalId);
+    if (!goal) return null;
+
+    const remaining = goal.targetAmount - goal.currentAmount;
+    if (remaining <= 0) return 0;
+
+    const settings = await this.getSettings();
+    if (!settings.averageDailyEarning || settings.averageDailyEarning <= 0) {
+      return null;
+    }
+
+    return Math.ceil(remaining / settings.averageDailyEarning);
+  },
+
+  async getEarningsStats(): Promise<{
+    today: number;
+    thisWeek: number;
+    thisMonth: number;
+    allTime: number;
+  }> {
+    const sessions = await this.getCompletedWorkSessions();
+    const now = new Date();
+    
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay() + 1);
+    weekStart.setHours(0, 0, 0, 0);
+    
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    let today = 0;
+    let thisWeek = 0;
+    let thisMonth = 0;
+    let allTime = 0;
+
+    for (const session of sessions) {
+      const earning = session.actualEarning || 0;
+      const date = new Date(session.completedAt || session.date);
+      
+      allTime += earning;
+      
+      if (date >= monthStart) {
+        thisMonth += earning;
+      }
+      
+      if (date >= weekStart) {
+        thisWeek += earning;
+      }
+      
+      if (date >= todayStart) {
+        today += earning;
+      }
+    }
+
+    return { today, thisWeek, thisMonth, allTime };
+  },
+
+  async getGoalProgress(goalId: string): Promise<{
+    percentage: number;
+    remaining: number;
+    daysToGoal: number | null;
+    contributionsCount: number;
+    lastContribution: Contribution | null;
+  }> {
+    const goals = await this.getGoals();
+    const goal = goals.find((g) => g.id === goalId);
+    
+    if (!goal) {
+      return {
+        percentage: 0,
+        remaining: 0,
+        daysToGoal: null,
+        contributionsCount: 0,
+        lastContribution: null,
+      };
+    }
+
+    const contributions = await this.getContributionsByGoal(goalId);
+    const daysToGoal = await this.calculateDaysToGoal(goalId);
+
+    return {
+      percentage: goal.targetAmount > 0 
+        ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100))
+        : 0,
+      remaining: Math.max(0, goal.targetAmount - goal.currentAmount),
+      daysToGoal,
+      contributionsCount: contributions.length,
+      lastContribution: contributions[0] || null,
+    };
   },
 };

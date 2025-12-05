@@ -1,5 +1,14 @@
 import React, { useCallback, useState } from "react";
-import { StyleSheet, ScrollView, View, RefreshControl, Pressable, Modal, TextInput } from "react-native";
+import {
+  StyleSheet,
+  ScrollView,
+  View,
+  RefreshControl,
+  Pressable,
+  Modal,
+  TextInput,
+  Alert,
+} from "react-native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
@@ -9,6 +18,8 @@ import * as Haptics from "expo-haptics";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { Button } from "@/components/Button";
+import { Card } from "@/components/Card";
+import { ProgressBar } from "@/components/ProgressBar";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius, QUICK_AMOUNTS } from "@/constants/theme";
 import { storage } from "@/lib/storage";
@@ -25,6 +36,22 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+function getDaysWord(days: number): string {
+  const lastTwo = days % 100;
+  const lastOne = days % 10;
+
+  if (lastTwo >= 11 && lastTwo <= 19) {
+    return "дней";
+  }
+  if (lastOne === 1) {
+    return "день";
+  }
+  if (lastOne >= 2 && lastOne <= 4) {
+    return "дня";
+  }
+  return "дней";
+}
+
 export default function GoalsScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { theme } = useTheme();
@@ -35,7 +62,7 @@ export default function GoalsScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [archivedCount, setArchivedCount] = useState(0);
-  
+
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
   const [quickAmount, setQuickAmount] = useState("");
@@ -43,10 +70,10 @@ export default function GoalsScreen() {
   const loadData = useCallback(async () => {
     const activeGoals = await storage.getActiveGoals();
     setGoals(activeGoals);
-    
+
     const appSettings = await storage.getSettings();
     setSettings(appSettings);
-    
+
     const archived = await storage.getArchivedGoals();
     setArchivedCount(archived.length);
   }, []);
@@ -71,7 +98,7 @@ export default function GoalsScreen() {
 
   const handleQuickAddSubmit = async () => {
     if (!selectedGoal) return;
-    
+
     const amount = parseFloat(quickAmount.replace(/[^\d.]/g, "")) || 0;
     if (amount <= 0) {
       setShowQuickAdd(false);
@@ -90,6 +117,11 @@ export default function GoalsScreen() {
 
     if (toSafe > 0) {
       await storage.addToSafe(toSafe, "Излишек от накопления");
+      Alert.alert(
+        "Цель перевыполнена!",
+        `${formatCurrency(toGoal)} ₽ добавлено к цели "${selectedGoal.name}".\n\nИзлишек ${formatCurrency(toSafe)} ₽ сохранён в общие накопления.`,
+        [{ text: "Отлично", style: "default" }]
+      );
     }
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -112,8 +144,8 @@ export default function GoalsScreen() {
     setQuickAmount(number.toLocaleString("ru-RU"));
   };
 
-  const activeGoals = goals.filter(g => g.currentAmount < g.targetAmount);
-  const completedGoals = goals.filter(g => g.currentAmount >= g.targetAmount);
+  const activeGoals = goals.filter((g) => g.currentAmount < g.targetAmount);
+  const completedGoals = goals.filter((g) => g.currentAmount >= g.targetAmount);
   const totalSaved = goals.reduce((sum, g) => sum + g.currentAmount, 0);
   const totalTarget = goals.reduce((sum, g) => sum + g.targetAmount, 0);
 
@@ -138,11 +170,14 @@ export default function GoalsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <ThemedText type="caption" secondary>
+          <ThemedText type="small" secondary>
             Всего накоплено
           </ThemedText>
           <ThemedText type="amountLarge">
-            {formatCurrency(totalSaved)} <ThemedText type="h2" secondary>₽</ThemedText>
+            {formatCurrency(totalSaved)}{" "}
+            <ThemedText type="h2" secondary>
+              ₽
+            </ThemedText>
           </ThemedText>
           {totalTarget > 0 && (
             <ThemedText type="small" secondary style={styles.targetText}>
@@ -151,171 +186,206 @@ export default function GoalsScreen() {
           )}
         </View>
 
-        <View style={[styles.divider, { backgroundColor: theme.divider }]} />
-
         <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <ThemedText type="h2">{activeGoals.length}</ThemedText>
-            <ThemedText type="small" secondary>активных</ThemedText>
+          <View style={[styles.statCard, { backgroundColor: theme.card }]}>
+            <ThemedText type="h2" style={{ color: theme.primary }}>
+              {activeGoals.length}
+            </ThemedText>
+            <ThemedText type="small" secondary>
+              активных
+            </ThemedText>
           </View>
-          <View style={[styles.statDivider, { backgroundColor: theme.divider }]} />
-          <View style={styles.statItem}>
-            <ThemedText type="h2">{completedGoals.length}</ThemedText>
-            <ThemedText type="small" secondary>достигнуто</ThemedText>
+          <View style={[styles.statCard, { backgroundColor: theme.card }]}>
+            <ThemedText type="h2" style={{ color: theme.success }}>
+              {completedGoals.length}
+            </ThemedText>
+            <ThemedText type="small" secondary>
+              достигнуто
+            </ThemedText>
           </View>
           {archivedCount > 0 && (
-            <>
-              <View style={[styles.statDivider, { backgroundColor: theme.divider }]} />
-              <View style={styles.statItem}>
-                <ThemedText type="h2" secondary>{archivedCount}</ThemedText>
-                <ThemedText type="small" secondary>в архиве</ThemedText>
-              </View>
-            </>
+            <Pressable
+              style={[styles.statCard, { backgroundColor: theme.card }]}
+              onPress={() => navigation.navigate("ArchivedGoals")}
+            >
+              <ThemedText type="h2" secondary>
+                {archivedCount}
+              </ThemedText>
+              <ThemedText type="small" secondary>
+                в архиве
+              </ThemedText>
+            </Pressable>
           )}
         </View>
 
-        <View style={[styles.divider, { backgroundColor: theme.divider }]} />
-
         {activeGoals.length > 0 && (
           <View style={styles.section}>
-            <ThemedText type="caption" secondary style={styles.sectionLabel}>
-              Активные
+            <ThemedText type="h4" style={styles.sectionTitle}>
+              Активные цели
             </ThemedText>
-            {activeGoals.map((goal, index) => {
-              const progress = Math.round((goal.currentAmount / goal.targetAmount) * 100);
-              const remaining = goal.targetAmount - goal.currentAmount;
-              const daysToGoal = settings?.averageDailyEarning && settings.averageDailyEarning > 0
-                ? Math.ceil(remaining / settings.averageDailyEarning)
-                : null;
-              
-              return (
-                <Pressable
-                  key={goal.id}
-                  style={[
-                    styles.goalItem,
-                    index < activeGoals.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.divider },
-                  ]}
-                  onPress={() => navigation.navigate("GoalDetail", { goalId: goal.id })}
-                  onLongPress={() => handleQuickAddOpen(goal)}
-                >
-                  <View style={styles.goalRow}>
-                    <View style={styles.goalInfo}>
-                      <ThemedText type="body" numberOfLines={1}>
-                        {goal.name}
-                      </ThemedText>
-                      <ThemedText type="small" secondary>
-                        {progress}%{daysToGoal !== null && ` · ${daysToGoal} дн.`}
-                      </ThemedText>
-                    </View>
-                    <View style={styles.goalRight}>
-                      <View style={styles.goalAmounts}>
-                        <ThemedText type="amount">
-                          {formatCurrency(goal.currentAmount)}
+            <Card style={styles.goalsCard}>
+              {activeGoals.map((goal, index) => {
+                const progress = Math.round(
+                  (goal.currentAmount / goal.targetAmount) * 100
+                );
+                const remaining = goal.targetAmount - goal.currentAmount;
+                const daysToGoal =
+                  settings?.averageDailyEarning && settings.averageDailyEarning > 0
+                    ? Math.ceil(remaining / settings.averageDailyEarning)
+                    : null;
+
+                return (
+                  <Pressable
+                    key={goal.id}
+                    style={[
+                      styles.goalItem,
+                      index < activeGoals.length - 1 && {
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.divider,
+                      },
+                    ]}
+                    onPress={() =>
+                      navigation.navigate("GoalDetail", { goalId: goal.id })
+                    }
+                    onLongPress={() => handleQuickAddOpen(goal)}
+                  >
+                    <View style={styles.goalHeader}>
+                      <View style={styles.goalTitleRow}>
+                        <ThemedText type="body" numberOfLines={1} style={{ fontWeight: "600" }}>
+                          {goal.name}
                         </ThemedText>
+                        <Pressable
+                          style={[styles.quickAddBtn, { backgroundColor: theme.backgroundSecondary }]}
+                          onPress={() => handleQuickAddOpen(goal)}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <MaterialCommunityIcons name="plus" size={18} color={theme.text} />
+                        </Pressable>
+                      </View>
+                    </View>
+
+                    <View style={styles.goalAmountRow}>
+                      <View>
+                        <ThemedText type="h3">{formatCurrency(goal.currentAmount)} ₽</ThemedText>
                         <ThemedText type="small" secondary>
-                          / {formatCurrency(goal.targetAmount)}
+                          из {formatCurrency(goal.targetAmount)} ₽
                         </ThemedText>
                       </View>
-                      <MaterialCommunityIcons
-                        name="chevron-right"
-                        size={20}
-                        color={theme.textTertiary}
-                      />
+                      {daysToGoal !== null && daysToGoal > 0 && (
+                        <View style={[styles.daysTag, { backgroundColor: theme.accentMuted }]}>
+                          <MaterialCommunityIcons
+                            name="clock-outline"
+                            size={14}
+                            color={theme.accent}
+                          />
+                          <ThemedText
+                            type="small"
+                            style={{ color: theme.accent, marginLeft: 4, fontWeight: "500" }}
+                          >
+                            ~{daysToGoal} {getDaysWord(daysToGoal)}
+                          </ThemedText>
+                        </View>
+                      )}
                     </View>
-                  </View>
-                  <View style={[styles.progressTrack, { backgroundColor: theme.divider }]}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        {
-                          backgroundColor: theme.text,
-                          width: `${Math.min(progress, 100)}%`,
-                        },
-                      ]}
-                    />
-                  </View>
-                </Pressable>
-              );
-            })}
+
+                    <View style={styles.progressRow}>
+                      <ProgressBar percentage={progress} height={6} />
+                      <View style={styles.progressMeta}>
+                        <ThemedText type="small" secondary>
+                          {progress}%
+                        </ThemedText>
+                        <ThemedText type="small" secondary>
+                          осталось {formatCurrency(remaining)} ₽
+                        </ThemedText>
+                      </View>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </Card>
           </View>
         )}
 
         {completedGoals.length > 0 && (
-          <>
-            <View style={[styles.divider, { backgroundColor: theme.divider }]} />
-            <View style={styles.section}>
-              <ThemedText type="caption" secondary style={styles.sectionLabel}>
-                Достигнуто
-              </ThemedText>
+          <View style={styles.section}>
+            <ThemedText type="h4" style={styles.sectionTitle}>
+              Достигнутые цели
+            </ThemedText>
+            <Card style={styles.goalsCard}>
               {completedGoals.map((goal, index) => (
                 <Pressable
                   key={goal.id}
                   style={[
-                    styles.goalItemSimple,
-                    index < completedGoals.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.divider },
+                    styles.completedGoalItem,
+                    index < completedGoals.length - 1 && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.divider,
+                    },
                   ]}
-                  onPress={() => navigation.navigate("GoalDetail", { goalId: goal.id })}
+                  onPress={() =>
+                    navigation.navigate("GoalDetail", { goalId: goal.id })
+                  }
                 >
-                  <View style={styles.goalRow}>
-                    <View style={styles.goalInfo}>
-                      <ThemedText type="body" numberOfLines={1}>
-                        {goal.name}
-                      </ThemedText>
-                    </View>
-                    <View style={styles.goalRight}>
-                      <ThemedText type="body" style={{ color: theme.accent }}>
-                        {formatCurrency(goal.targetAmount)} ₽
-                      </ThemedText>
-                      <MaterialCommunityIcons
-                        name="chevron-right"
-                        size={20}
-                        color={theme.textTertiary}
-                      />
-                    </View>
+                  <View style={[styles.completedIcon, { backgroundColor: theme.successMuted }]}>
+                    <MaterialCommunityIcons name="check" size={20} color={theme.success} />
                   </View>
+                  <View style={styles.completedInfo}>
+                    <ThemedText type="body" numberOfLines={1} style={{ fontWeight: "500" }}>
+                      {goal.name}
+                    </ThemedText>
+                    <ThemedText type="small" style={{ color: theme.success }}>
+                      {formatCurrency(goal.targetAmount)} ₽ достигнуто
+                    </ThemedText>
+                  </View>
+                  <MaterialCommunityIcons
+                    name="chevron-right"
+                    size={22}
+                    color={theme.textTertiary}
+                  />
                 </Pressable>
               ))}
-            </View>
-          </>
+            </Card>
+          </View>
         )}
 
         {archivedCount > 0 && (
-          <>
-            <View style={[styles.divider, { backgroundColor: theme.divider }]} />
-            <Pressable
-              style={styles.archiveLink}
-              onPress={() => navigation.navigate("ArchivedGoals")}
-            >
-              <ThemedText type="body" secondary>
-                Архив
+          <Pressable
+            style={[styles.archiveLink, { backgroundColor: theme.card }]}
+            onPress={() => navigation.navigate("ArchivedGoals")}
+          >
+            <View style={styles.archiveLinkContent}>
+              <MaterialCommunityIcons name="archive" size={22} color={theme.textSecondary} />
+              <ThemedText type="body" secondary style={{ marginLeft: Spacing.md }}>
+                Архив целей
               </ThemedText>
-              <View style={styles.archiveRight}>
-                <ThemedText type="body" secondary>
-                  {archivedCount}
-                </ThemedText>
-                <MaterialCommunityIcons
-                  name="chevron-right"
-                  size={20}
-                  color={theme.textTertiary}
-                />
-              </View>
-            </Pressable>
-          </>
+            </View>
+            <View style={styles.archiveRight}>
+              <ThemedText type="body" secondary>
+                {archivedCount}
+              </ThemedText>
+              <MaterialCommunityIcons
+                name="chevron-right"
+                size={22}
+                color={theme.textTertiary}
+              />
+            </View>
+          </Pressable>
         )}
 
         {goals.length === 0 && (
-          <View style={styles.emptyState}>
-            <ThemedText type="body" secondary style={styles.emptyText}>
-              Нет активных целей
+          <View style={[styles.emptyState, { backgroundColor: theme.card }]}>
+            <View style={[styles.emptyIcon, { backgroundColor: theme.primaryMuted }]}>
+              <MaterialCommunityIcons name="flag-outline" size={48} color={theme.primary} />
+            </View>
+            <ThemedText type="h3" style={{ marginTop: Spacing.lg }}>
+              Нет целей
             </ThemedText>
-            <Pressable
-              style={styles.addLink}
-              onPress={() => navigation.navigate("AddGoal")}
-            >
-              <ThemedText type="body" style={{ color: theme.accent }}>
-                Создать первую цель
-              </ThemedText>
-            </Pressable>
+            <ThemedText type="body" secondary style={{ textAlign: "center", marginTop: Spacing.sm }}>
+              Создайте свою первую финансовую цель и начните копить
+            </ThemedText>
+            <Button onPress={() => navigation.navigate("AddGoal")} style={{ marginTop: Spacing.lg }}>
+              Создать цель
+            </Button>
           </View>
         )}
       </ScrollView>
@@ -324,7 +394,7 @@ export default function GoalsScreen() {
         style={[styles.fab, { backgroundColor: theme.text }]}
         onPress={() => navigation.navigate("AddGoal")}
       >
-        <MaterialCommunityIcons name="plus" size={24} color={theme.backgroundDefault} />
+        <MaterialCommunityIcons name="plus" size={28} color={theme.backgroundDefault} />
       </Pressable>
 
       <Modal
@@ -337,19 +407,30 @@ export default function GoalsScreen() {
           style={[styles.modalOverlay, { backgroundColor: theme.overlay }]}
           onPress={() => setShowQuickAdd(false)}
         >
-          <Pressable style={[styles.modalContent, { backgroundColor: theme.card }]} onPress={() => {}}>
+          <Pressable
+            style={[styles.modalContent, { backgroundColor: theme.card }]}
+            onPress={() => {}}
+          >
             <View style={styles.modalHeader}>
               <ThemedText type="h3">Пополнить</ThemedText>
               <ThemedText type="body" secondary style={styles.modalGoalName}>
                 {selectedGoal?.name}
               </ThemedText>
+              {selectedGoal && (
+                <ThemedText type="small" style={{ color: theme.accent, marginTop: 2 }}>
+                  Осталось: {formatCurrency(selectedGoal.targetAmount - selectedGoal.currentAmount)} ₽
+                </ThemedText>
+              )}
             </View>
 
             <View style={styles.quickAmounts}>
               {QUICK_AMOUNTS.map((amount) => (
                 <Pressable
                   key={amount}
-                  style={[styles.quickAmountButton, { backgroundColor: theme.backgroundSecondary }]}
+                  style={[
+                    styles.quickAmountButton,
+                    { backgroundColor: theme.backgroundSecondary },
+                  ]}
                   onPress={() => handleQuickAmount(amount)}
                 >
                   <ThemedText type="body" style={{ color: theme.accent }}>
@@ -369,14 +450,28 @@ export default function GoalsScreen() {
                 keyboardType="numeric"
                 autoFocus
               />
-              <ThemedText type="h3" style={{ color: theme.textTertiary }}>₽</ThemedText>
+              <ThemedText type="h3" style={{ color: theme.textTertiary }}>
+                ₽
+              </ThemedText>
             </View>
 
-            {selectedGoal && (
-              <ThemedText type="small" secondary style={styles.remainingHint}>
-                Осталось: {formatCurrency(selectedGoal.targetAmount - selectedGoal.currentAmount)} ₽
-              </ThemedText>
-            )}
+            {selectedGoal && quickAmount && (() => {
+              const amount = parseFloat(quickAmount.replace(/[^\d.]/g, "")) || 0;
+              const remaining = selectedGoal.targetAmount - selectedGoal.currentAmount;
+              const excess = Math.max(0, amount - remaining);
+              
+              if (excess > 0) {
+                return (
+                  <View style={[styles.excessNote, { backgroundColor: theme.successMuted }]}>
+                    <MaterialCommunityIcons name="information" size={18} color={theme.success} />
+                    <ThemedText type="small" style={{ color: theme.success, marginLeft: Spacing.xs, flex: 1 }}>
+                      Излишек {formatCurrency(excess)} ₽ уйдёт в общие накопления
+                    </ThemedText>
+                  </View>
+                );
+              }
+              return null;
+            })()}
 
             <View style={styles.modalActions}>
               <Button
@@ -386,10 +481,7 @@ export default function GoalsScreen() {
               >
                 Отмена
               </Button>
-              <Button
-                onPress={handleQuickAddSubmit}
-                style={styles.modalButton}
-              >
+              <Button onPress={handleQuickAddSubmit} style={styles.modalButton}>
                 Пополнить
               </Button>
             </View>
@@ -417,68 +509,92 @@ const styles = StyleSheet.create({
   targetText: {
     marginTop: Spacing.xs,
   },
-  divider: {
-    height: 1,
-    marginVertical: Spacing.sm,
-  },
   statsRow: {
     flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: Spacing.md,
+    gap: Spacing.md,
+    marginBottom: Spacing.xl,
   },
-  statItem: {
+  statCard: {
+    flex: 1,
+    borderRadius: BorderRadius.lg,
+    padding: Spacing.md,
     alignItems: "center",
-    paddingHorizontal: Spacing.lg,
-  },
-  statDivider: {
-    width: 1,
-    height: 32,
   },
   section: {
-    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.xl,
   },
-  sectionLabel: {
-    marginBottom: Spacing.sm,
+  sectionTitle: {
+    marginBottom: Spacing.md,
+  },
+  goalsCard: {
+    padding: 0,
+    overflow: "hidden",
   },
   goalItem: {
-    paddingVertical: Spacing.md,
+    padding: Spacing.md,
   },
-  goalItemSimple: {
-    paddingVertical: Spacing.md,
+  goalHeader: {
+    marginBottom: Spacing.sm,
   },
-  goalRow: {
+  goalTitleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: Spacing.sm,
   },
-  goalInfo: {
-    flex: 1,
-    marginRight: Spacing.md,
+  quickAddBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: BorderRadius.sm,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  goalRight: {
+  goalAmountRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: Spacing.md,
+  },
+  daysTag: {
     flexDirection: "row",
     alignItems: "center",
-    gap: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 4,
+    borderRadius: BorderRadius.sm,
   },
-  goalAmounts: {
-    alignItems: "flex-end",
+  progressRow: {
+    gap: Spacing.xs,
   },
-  progressTrack: {
-    height: 2,
-    borderRadius: 1,
-    overflow: "hidden",
+  progressMeta: {
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
-  progressFill: {
-    height: "100%",
-    borderRadius: 1,
+  completedGoalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.md,
+  },
+  completedIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: BorderRadius.md,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: Spacing.md,
+  },
+  completedInfo: {
+    flex: 1,
   },
   archiveLink: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    marginBottom: Spacing.xl,
+  },
+  archiveLinkContent: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   archiveRight: {
     flexDirection: "row",
@@ -486,24 +602,32 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   emptyState: {
-    paddingVertical: Spacing.xxl,
+    borderRadius: BorderRadius.xl,
+    padding: Spacing.xl,
     alignItems: "center",
+    marginTop: Spacing.lg,
   },
-  emptyText: {
-    marginBottom: Spacing.md,
-  },
-  addLink: {
-    paddingVertical: Spacing.sm,
+  emptyIcon: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    justifyContent: "center",
+    alignItems: "center",
   },
   fab: {
     position: "absolute",
     right: Spacing.lg,
     bottom: 100,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: "center",
     alignItems: "center",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   modalOverlay: {
     flex: 1,
@@ -542,14 +666,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   amountInput: {
-    fontSize: 40,
-    fontWeight: "200",
+    fontSize: 48,
+    fontWeight: "300",
     textAlign: "center",
-    minWidth: 100,
+    minWidth: 120,
   },
-  remainingHint: {
-    textAlign: "center",
-    marginBottom: Spacing.lg,
+  excessNote: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.md,
   },
   modalActions: {
     flexDirection: "row",
