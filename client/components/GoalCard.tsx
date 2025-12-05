@@ -128,6 +128,7 @@ export function GoalCard({ goal, onPress, onQuickAdd, daysToGoal }: GoalCardProp
       <ProgressBar 
         percentage={percentage} 
         color={isCompleted ? Colors.dark.success : undefined}
+        dynamicColor={!isCompleted}
       />
 
       {!isCompleted ? (

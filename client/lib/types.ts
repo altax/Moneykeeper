@@ -18,6 +18,19 @@ export interface Contribution {
   createdAt: string;
 }
 
+export type WorkOperationType = "reception" | "returns";
+
+export interface WorkSession {
+  id: string;
+  date: string;
+  operationType: WorkOperationType;
+  plannedEarning: number;
+  plannedContribution: number;
+  goalId?: string;
+  createdAt: string;
+  isCompleted?: boolean;
+}
+
 export interface AppSettings {
   userName: string;
   notificationsEnabled: boolean;

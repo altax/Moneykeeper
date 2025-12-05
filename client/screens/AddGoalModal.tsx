@@ -110,7 +110,7 @@ export default function AddGoalModal() {
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: Spacing.lg,
+            paddingTop: Spacing.xl,
             paddingBottom: insets.bottom + Spacing.lg,
           },
         ]}

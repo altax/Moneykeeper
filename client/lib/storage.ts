@@ -1,9 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Goal, Contribution, AppSettings } from "./types";
+import { Goal, Contribution, AppSettings, WorkSession } from "./types";
 
 const GOALS_KEY = "@kopilka_goals";
 const CONTRIBUTIONS_KEY = "@kopilka_contributions";
 const SETTINGS_KEY = "@kopilka_settings";
+const WORK_SESSIONS_KEY = "@kopilka_work_sessions";
 
 const defaultSettings: AppSettings = {
   userName: "",
@@ -205,9 +206,70 @@ export const storage = {
 
   async clearAllData(): Promise<void> {
     try {
-      await AsyncStorage.multiRemove([GOALS_KEY, CONTRIBUTIONS_KEY, SETTINGS_KEY]);
+      await AsyncStorage.multiRemove([GOALS_KEY, CONTRIBUTIONS_KEY, SETTINGS_KEY, WORK_SESSIONS_KEY]);
     } catch (error) {
       console.error("Error clearing data:", error);
     }
+  },
+
+  async getWorkSessions(): Promise<WorkSession[]> {
+    try {
+      const data = await AsyncStorage.getItem(WORK_SESSIONS_KEY);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error("Error reading work sessions:", error);
+      return [];
+    }
+  },
+
+  async saveWorkSessions(sessions: WorkSession[]): Promise<void> {
+    try {
+      await AsyncStorage.setItem(WORK_SESSIONS_KEY, JSON.stringify(sessions));
+    } catch (error) {
+      console.error("Error saving work sessions:", error);
+    }
+  },
+
+  async addWorkSession(session: Omit<WorkSession, "id" | "createdAt">): Promise<WorkSession> {
+    const sessions = await this.getWorkSessions();
+    const newSession: WorkSession = {
+      ...session,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+    };
+    sessions.push(newSession);
+    await this.saveWorkSessions(sessions);
+    return newSession;
+  },
+
+  async updateWorkSession(id: string, updates: Partial<WorkSession>): Promise<WorkSession | null> {
+    const sessions = await this.getWorkSessions();
+    const index = sessions.findIndex((s) => s.id === id);
+    if (index === -1) return null;
+
+    sessions[index] = {
+      ...sessions[index],
+      ...updates,
+    };
+    await this.saveWorkSessions(sessions);
+    return sessions[index];
+  },
+
+  async deleteWorkSession(id: string): Promise<void> {
+    const sessions = await this.getWorkSessions();
+    const filtered = sessions.filter((s) => s.id !== id);
+    await this.saveWorkSessions(filtered);
+  },
+
+  async getActiveWorkSession(): Promise<WorkSession | null> {
+    const sessions = await this.getWorkSessions();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return sessions.find((s) => {
+      const sessionDate = new Date(s.date);
+      sessionDate.setHours(0, 0, 0, 0);
+      return sessionDate >= today && !s.isCompleted;
+    }) || null;
   },
 };
