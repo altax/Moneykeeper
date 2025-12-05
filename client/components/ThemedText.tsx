@@ -6,7 +6,9 @@ import { Typography } from "@/constants/theme";
 export type ThemedTextProps = TextProps & {
   lightColor?: string;
   darkColor?: string;
-  type?: "h1" | "h2" | "h3" | "h4" | "body" | "small" | "link";
+  type?: "hero" | "h1" | "h2" | "h3" | "h4" | "body" | "bodyLarge" | "small" | "caption" | "link";
+  secondary?: boolean;
+  disabled?: boolean;
 };
 
 export function ThemedText({
@@ -14,11 +16,17 @@ export function ThemedText({
   lightColor,
   darkColor,
   type = "body",
+  secondary = false,
+  disabled = false,
   ...rest
 }: ThemedTextProps) {
   const { theme, isDark } = useTheme();
 
   const getColor = () => {
+    if (disabled) {
+      return theme.textDisabled;
+    }
+
     if (isDark && darkColor) {
       return darkColor;
     }
@@ -31,11 +39,17 @@ export function ThemedText({
       return theme.link;
     }
 
+    if (secondary) {
+      return theme.textSecondary;
+    }
+
     return theme.text;
   };
 
   const getTypeStyle = () => {
     switch (type) {
+      case "hero":
+        return Typography.hero;
       case "h1":
         return Typography.h1;
       case "h2":
@@ -46,8 +60,12 @@ export function ThemedText({
         return Typography.h4;
       case "body":
         return Typography.body;
+      case "bodyLarge":
+        return Typography.bodyLarge;
       case "small":
         return Typography.small;
+      case "caption":
+        return Typography.caption;
       case "link":
         return Typography.link;
       default:

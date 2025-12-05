@@ -8,7 +8,7 @@ import {
   Text,
   Modal,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { ThemedView } from "@/components/ThemedView";
 import { ThemedText } from "@/components/ThemedText";
 import { useTheme } from "@/hooks/useTheme";
@@ -53,17 +53,25 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
             },
           ]}
         >
-          <Feather name="alert-circle" size={20} color={theme.text} />
+          <MaterialCommunityIcons name="alert-circle" size={20} color={theme.text} />
         </Pressable>
       ) : null}
 
       <View style={styles.content}>
-        <ThemedText type="h1" style={styles.title}>
-          Something went wrong
+        <View style={styles.iconContainer}>
+          <MaterialCommunityIcons
+            name="piggy-bank-outline"
+            size={64}
+            color={theme.primary}
+          />
+        </View>
+
+        <ThemedText type="h2" style={styles.title}>
+          Что-то пошло не так
         </ThemedText>
 
-        <ThemedText type="body" style={styles.message}>
-          Please reload the app to continue.
+        <ThemedText type="body" secondary style={styles.message}>
+          Копилка столкнулась с проблемой. Перезапустите приложение, чтобы продолжить.
         </ThemedText>
 
         <Pressable
@@ -71,7 +79,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
           style={({ pressed }) => [
             styles.button,
             {
-              backgroundColor: theme.link,
+              backgroundColor: theme.primary,
               opacity: pressed ? 0.9 : 1,
               transform: [{ scale: pressed ? 0.98 : 1 }],
             },
@@ -81,7 +89,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
             type="body"
             style={[styles.buttonText, { color: theme.buttonText }]}
           >
-            Try Again
+            Перезапустить
           </ThemedText>
         </Pressable>
       </View>
@@ -106,7 +114,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
                     { opacity: pressed ? 0.6 : 1 },
                   ]}
                 >
-                  <Feather name="x" size={24} color={theme.text} />
+                  <MaterialCommunityIcons name="close" size={24} color={theme.text} />
                 </Pressable>
               </View>
 
@@ -150,7 +158,7 @@ const styles = StyleSheet.create({
     height: "100%",
     justifyContent: "center",
     alignItems: "center",
-    padding: Spacing["2xl"],
+    padding: Spacing.xl,
   },
   content: {
     alignItems: "center",
@@ -159,18 +167,18 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 600,
   },
+  iconContainer: {
+    marginBottom: Spacing.md,
+  },
   title: {
     textAlign: "center",
-    lineHeight: 40,
   },
   message: {
     textAlign: "center",
-    opacity: 0.7,
-    lineHeight: 24,
   },
   topButton: {
     position: "absolute",
-    top: Spacing["2xl"] + Spacing.lg,
+    top: Spacing.xl + Spacing.lg,
     right: Spacing.lg,
     width: 44,
     height: 44,
@@ -181,9 +189,9 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   button: {
-    paddingVertical: Spacing.lg,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: Spacing["2xl"],
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    paddingHorizontal: Spacing.xl,
     minWidth: 200,
     shadowColor: "#000",
     shadowOffset: {
@@ -207,8 +215,8 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: "100%",
     height: "90%",
-    borderTopLeftRadius: BorderRadius.lg,
-    borderTopRightRadius: BorderRadius.lg,
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
   },
   modalHeader: {
     flexDirection: "row",
