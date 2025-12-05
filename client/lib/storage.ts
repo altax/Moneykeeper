@@ -399,4 +399,103 @@ export const storage = {
       await this.withdrawFromSafe(dist.amount, dist.goalId, "Распределение из сейфа");
     }
   },
+
+  async completeWorkSession(
+    id: string,
+    actualEarning: number,
+    actualContribution: number,
+    goalId?: string
+  ): Promise<WorkSession | null> {
+    const sessions = await this.getWorkSessions();
+    const index = sessions.findIndex((s) => s.id === id);
+    if (index === -1) return null;
+
+    const session = sessions[index];
+    const freeToSafe = Math.max(0, actualEarning - actualContribution);
+
+    sessions[index] = {
+      ...session,
+      status: "completed",
+      isCompleted: true,
+      actualEarning,
+      actualContribution,
+      goalId: goalId || session.goalId,
+      completedAt: new Date().toISOString(),
+    };
+    await this.saveWorkSessions(sessions);
+
+    if (actualContribution > 0 && (goalId || session.goalId)) {
+      await this.addContribution({
+        goalId: goalId || session.goalId!,
+        amount: actualContribution,
+        note: `Смена ${new Date(session.date).toLocaleDateString("ru-RU")}`,
+        date: new Date().toISOString(),
+      });
+    }
+
+    if (freeToSafe > 0) {
+      const sessionDate = new Date(session.date).toLocaleDateString("ru-RU", {
+        day: "numeric",
+        month: "short",
+      });
+      await this.addToSafe(freeToSafe, `Свободные средства (${sessionDate})`);
+    }
+
+    return sessions[index];
+  },
+
+  async skipWorkSession(id: string): Promise<void> {
+    const sessions = await this.getWorkSessions();
+    const index = sessions.findIndex((s) => s.id === id);
+    if (index === -1) return;
+
+    sessions[index] = {
+      ...sessions[index],
+      status: "skipped",
+      isCompleted: true,
+      completedAt: new Date().toISOString(),
+    };
+    await this.saveWorkSessions(sessions);
+  },
+
+  async getPlannedWorkSessions(): Promise<WorkSession[]> {
+    const sessions = await this.getWorkSessions();
+    return sessions.filter((s) => !s.isCompleted && s.status !== "completed" && s.status !== "skipped")
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  },
+
+  async getCompletedWorkSessions(): Promise<WorkSession[]> {
+    const sessions = await this.getWorkSessions();
+    return sessions.filter((s) => s.status === "completed" || (s.isCompleted && s.actualEarning !== undefined))
+      .sort((a, b) => new Date(b.completedAt || b.date).getTime() - new Date(a.completedAt || a.date).getTime());
+  },
+
+  async getPlannedSessionsSummary(): Promise<{
+    totalEarnings: number;
+    totalContributions: number;
+    freeToSafe: number;
+    sessionsCount: number;
+  }> {
+    const sessions = await this.getPlannedWorkSessions();
+    const totalEarnings = sessions.reduce((sum, s) => sum + s.plannedEarning, 0);
+    const totalContributions = sessions.reduce((sum, s) => sum + s.plannedContribution, 0);
+    return {
+      totalEarnings,
+      totalContributions,
+      freeToSafe: totalEarnings - totalContributions,
+      sessionsCount: sessions.length,
+    };
+  },
+
+  async getTodayOrPastUncompletedSessions(): Promise<WorkSession[]> {
+    const sessions = await this.getWorkSessions();
+    const now = new Date();
+    now.setHours(23, 59, 59, 999);
+    
+    return sessions.filter((s) => {
+      const sessionDate = new Date(s.date);
+      sessionDate.setHours(23, 59, 59, 999);
+      return sessionDate <= now && !s.isCompleted && s.status !== "completed" && s.status !== "skipped";
+    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  },
 };

@@ -21,6 +21,7 @@ export interface Contribution {
 
 export type WorkOperationType = "reception" | "returns";
 export type ShiftType = "day" | "night";
+export type WorkSessionStatus = "planned" | "completed" | "skipped";
 
 export interface WorkSession {
   id: string;
@@ -32,6 +33,20 @@ export interface WorkSession {
   goalId?: string;
   createdAt: string;
   isCompleted?: boolean;
+  status?: WorkSessionStatus;
+  actualEarning?: number;
+  actualContribution?: number;
+  completedAt?: string;
+}
+
+export interface CompletedShiftRecord {
+  id: string;
+  date: string;
+  actualEarning: number;
+  actualContribution: number;
+  freeToSafe: number;
+  goalId?: string;
+  completedAt: string;
 }
 
 export interface AppSettings {
